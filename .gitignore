@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Local research data / outputs (never commit real participant data)
+eye_data/*
+!eye_data/.gitkeep
+outputs/*
+!outputs/.gitkeep
+models/*
+!models/.gitkeep
+calibrations/*
+!calibrations/.gitkeep
+
+# Local client database (contains participant PII once the app is used)
+clients.db
+*.db
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.log
+
+# VS Code (keep shared run config, ignore personal machine state)
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec

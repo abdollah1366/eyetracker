@@ -1,3 +1,8 @@
+"""Shared paths and tunable constants for the whole pipeline.
+
+Importing this module also creates the local data directories (eye_data,
+outputs, models, calibrations) if they don't exist yet.
+"""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent

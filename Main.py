@@ -1,3 +1,7 @@
+"""PyQt5 desktop app: the single entry point for the research pipeline
+(participant registry, calibration, data collection, clinical scores,
+model training, status). Run with: python Main.py
+"""
 import sys, subprocess, sqlite3
 from PyQt5.QtWidgets import QApplication,QWidget,QVBoxLayout,QHBoxLayout,QPushButton,QLabel,QListWidget,QStackedWidget,QMessageBox,QInputDialog,QLineEdit,QFormLayout,QTableWidget,QTableWidgetItem,QComboBox
 from PyQt5.QtCore import Qt
