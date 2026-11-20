@@ -120,7 +120,7 @@ export interface CalibrationPoint {
 }
 
 export interface Calibration {
-  /** 2 x 15 coefficient matrix (2nd-order polynomial over 4 features) */
+  /** 2 x 3 affine coefficient matrix ([1, avg iris x, avg iris y]); legacy 2 x 15 also accepted */
   coef: number[][];
   mean_error_px: number;
   median_error_px: number;

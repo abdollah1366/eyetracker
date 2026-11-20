@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CircleDot, X } from 'lucide-react';
 import type { Calibration, CalibrationPoint } from '../../lib/types';
+import { enterFullscreen, onViewportChange } from '../../lib/fullscreen';
 import {
   fitGazeMapping,
   medianVector,
@@ -10,19 +11,19 @@ import {
 
 const SETTLE_MS = 350;
 const DWELL_MS = 1500;
-const MIN_POINTS = 7;
+const MIN_POINTS = 5;
 
-/** 3x3 grid in normalized screen coordinates. */
-const GRID: Array<[number, number]> = [
-  [0.1, 0.12],
-  [0.5, 0.12],
-  [0.9, 0.12],
-  [0.1, 0.5],
+/** Inset keeps corner markers clear of the status/progress overlays and fully visible. */
+const EDGE_INSET_X = 96;
+const EDGE_INSET_Y = 128;
+
+/** Four true screen corners, then the centre (normalized 0..1). */
+const TARGET_POSITIONS: Array<[number, number]> = [
+  [0, 0],
+  [1, 0],
+  [0, 1],
+  [1, 1],
   [0.5, 0.5],
-  [0.9, 0.5],
-  [0.1, 0.88],
-  [0.5, 0.88],
-  [0.9, 0.88],
 ];
 
 export function CalibrationOverlay({
@@ -41,19 +42,35 @@ export function CalibrationOverlay({
   const [frameTick, setFrameTick] = useState(0);
   const [collected, setCollected] = useState<CalibrationPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
   const featuresRef = useRef<number[][]>([]);
   const rafRef = useRef<number>(0);
   const phaseStartRef = useRef<number>(performance.now());
   const collectedRef = useRef<CalibrationPoint[]>([]);
 
-  const targets = useMemo(
+  // The wizard requests fullscreen on click; retry here if that was blocked.
+  useEffect(() => {
+    void enterFullscreen();
+  }, []);
+
+  // Gaze targets are screen pixels — keep them in sync with the actual
+  // fullscreen viewport (including monitor changes / browser resize).
+  useEffect(
     () =>
-      GRID.map(([nx, ny]) => ({
-        x: Math.round(nx * window.innerWidth),
-        y: Math.round(ny * window.innerHeight),
-      })),
+      onViewportChange(() => {
+        setViewport({ w: window.innerWidth, h: window.innerHeight });
+      }),
     [],
   );
+
+  const targets = useMemo(() => {
+    const w = Math.max(viewport.w, 2 * EDGE_INSET_X + 1);
+    const h = Math.max(viewport.h, 2 * EDGE_INSET_Y + 1);
+    return TARGET_POSITIONS.map(([nx, ny]) => ({
+      x: Math.round(EDGE_INSET_X + nx * (w - 2 * EDGE_INSET_X)),
+      y: Math.round(EDGE_INSET_Y + ny * (h - 2 * EDGE_INSET_Y)),
+    }));
+  }, [viewport.w, viewport.h]);
   const target = targets[Math.min(index, targets.length - 1)];
 
   useEffect(() => {
@@ -160,7 +177,7 @@ export function CalibrationOverlay({
 
       <div className="absolute inset-x-0 top-0 flex items-center justify-between p-6">
         <div>
-          <p className="text-xs font-semibold text-white/60">کالیبراسیون ۹ نقطهای</p>
+          <p className="text-xs font-semibold text-white/60">کالیبراسیون ۵ نقطهای — چهار گوشه و مرکز</p>
           <p className="mt-1 text-sm font-bold">
             نقطه {index + 1} از {targets.length}
           </p>

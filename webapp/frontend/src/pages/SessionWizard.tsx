@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { apiErrorMessage, asItems, participantsApi, sessionsApi } from '../lib/api';
 import { newIdempotencyKey } from '../lib/idb';
+import { enterFullscreen, exitFullscreen } from '../lib/fullscreen';
 import { formatDecimal, formatPercent } from '../lib/format';
 import type {
   Calibration,
@@ -109,6 +110,7 @@ export function SessionWizard() {
     () => () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       engineRef.current?.close();
+      void exitFullscreen();
     },
     [],
   );
@@ -153,16 +155,25 @@ export function SessionWizard() {
     setStage('camera');
   };
 
+  const startCalibration = () => {
+    // Request fullscreen in the click handler; the overlay also retries on mount.
+    void enterFullscreen();
+    setStage('calibration-overlay');
+  };
+
   const beginCollection = async () => {
     if (!calibration || !participantId) return;
+    // Must run synchronously from the click handler to preserve user activation.
+    await enterFullscreen();
     setCreating(true);
     try {
       const created = await sessionsApi.create({
         participant_id: participantId,
         label,
         stimulus_set: 'ADHD',
-        screen_width: window.screen.width,
-        screen_height: window.screen.height,
+        // Same viewport the calibration targets were captured in.
+        screen_width: window.innerWidth,
+        screen_height: window.innerHeight,
         calibration,
         started_at: new Date().toISOString(),
         client_meta: {
@@ -206,6 +217,7 @@ export function SessionWizard() {
       } catch (err) {
         toast.error(apiErrorMessage(err));
       } finally {
+        void exitFullscreen();
         streamRef.current?.getTracks().forEach((t) => t.stop());
         engineRef.current?.close();
       }
@@ -403,7 +415,7 @@ export function SessionWizard() {
               <>
                 <CircleDot size={48} className="text-primary" />
                 <p className="text-sm text-ink-muted">کالیبراسیون در صفحه تمامصفحه آغاز میشود.</p>
-                <Button onClick={() => setStage('calibration-overlay')}>شروع کالیبراسیون</Button>
+                <Button onClick={startCalibration}>شروع کالیبراسیون</Button>
               </>
             )}
           </div>
@@ -416,9 +428,13 @@ export function SessionWizard() {
           video={videoRef.current}
           onComplete={(cal) => {
             setCalibration(cal);
+            void exitFullscreen();
             setStage('calibration');
           }}
-          onCancel={() => setStage('calibration')}
+          onCancel={() => {
+            void exitFullscreen();
+            setStage('calibration');
+          }}
         />
       ) : null}
 
@@ -431,7 +447,10 @@ export function SessionWizard() {
           session={session}
           stimuli={stimuli}
           onComplete={finishCollection}
-          onAbort={() => setStage('camera')}
+          onAbort={() => {
+            void exitFullscreen();
+            setStage('camera');
+          }}
         />
       ) : null}
 

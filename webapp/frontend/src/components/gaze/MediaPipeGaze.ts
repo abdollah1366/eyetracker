@@ -3,8 +3,9 @@
  *
  * Produces the SAME 4-feature vector as the Python engine:
  *   [ lnorm_x, lnorm_y, rnorm_x, rnorm_y ]
- * using FaceMesh refined iris/eye landmarks. Calibration therefore stays
- * compatible with the backend's 2nd-order polynomial model (15 coefficients).
+ * using FaceMesh refined iris/eye landmarks. The 5-point full-screen
+ * calibration fits a robust affine mapping; legacy 15-coefficient mappings
+ * from older sessions are still readable for backwards compatibility.
  *
  * IMPORTANT: raw camera frames never leave the browser. Only derived landmark
  * coordinates, the normalized feature vector and scalar brightness statistics
@@ -179,9 +180,29 @@ export function sampleBrightness(video: HTMLVideoElement): {
   }
 }
 
-/* ---------------- calibration maths (2nd-order polynomial, normal equations) ---------------- */
+/* ---------------- calibration maths ---------------- */
 
-/** Design matrix identical to legacy `polynomial_design(X, order=2)`. */
+/**
+ * Low-dimensional design used by the 5-point calibration.
+ *
+ * Four screen corners + centre give five observations, so a 15-coefficient
+ * 2nd-order polynomial (legacy desktop model) is under-determined and its
+ * normal equations are singular. We therefore fit a robust affine mapping
+ * with three coefficients per axis: [1, mean horizontal iris, mean vertical
+ * iris]. Iris position is approximately linear in screen position, and the
+ * extra observations are used to average out noise.
+ */
+export function gazeDesign(features: number[][]): number[][] {
+  return features.map((row) => {
+    const lx = row[0] ?? 0;
+    const ly = row[1] ?? 0;
+    const rx = row[2] ?? 0;
+    const ry = row[3] ?? 0;
+    return [1, (lx + rx) / 2, (ly + ry) / 2];
+  });
+}
+
+/** Legacy 2nd-order design, kept only to read calibrations saved by older builds. */
 export function polynomialDesign(features: number[][]): number[][] {
   const cols: number[][] = [];
   const n = features.length;
@@ -223,14 +244,14 @@ function solveNormalEquations(A: number[][], b: number[]): number[] {
   return M.map((row) => row[n]);
 }
 
-/** Fit a 2 x 15 coefficient matrix mapping features → screen XY. */
+/** Fit a 2 x 3 affine coefficient matrix mapping features → screen XY. */
 export function fitGazeMapping(features: number[][], screenXY: number[][]): {
   coef: number[][];
   meanErrorPx: number;
   medianErrorPx: number;
 } {
-  const X = polynomialDesign(features);
-  const k = X[0]?.length ?? 15;
+  const X = gazeDesign(features);
+  const k = X[0]?.length ?? 3;
   const XtX = Array.from({ length: k }, (_, i) =>
     Array.from({ length: k }, (_, j) => X.reduce((s, row) => s + row[i] * row[j], 0)),
   );
@@ -258,9 +279,14 @@ export function fitGazeMapping(features: number[][], screenXY: number[][]): {
   return { coef: [coefX, coefY], meanErrorPx: mean, medianErrorPx: median };
 }
 
-/** Apply a fitted mapping to a single 4-feature vector → screen pixel XY. */
+/**
+ * Apply a fitted mapping to a single 4-feature vector → screen pixel XY.
+ * Accepts both the new 3-coefficient affine model and legacy 15-coefficient
+ * calibrations still stored on older sessions.
+ */
 export function predictScreen(feature: number[], coef: number[][]): [number, number] {
-  const row = polynomialDesign([feature])[0];
+  const width = coef[0]?.length ?? 3;
+  const row = width === 15 ? polynomialDesign([feature])[0] : gazeDesign([feature])[0];
   const x = row.reduce((s, v, c) => s + v * (coef[0]?.[c] ?? 0), 0);
   const y = row.reduce((s, v, c) => s + v * (coef[1]?.[c] ?? 0), 0);
   return [x, y];

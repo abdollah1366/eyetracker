@@ -199,9 +199,30 @@ export function CollectionOverlay({
   if (aborted) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-[#061f27] text-white" dir="rtl">
-      <div className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-3">
+    <div className="fixed inset-0 z-[70] overflow-hidden bg-black text-white" dir="rtl">
+      {/* The stimulus occupies the ENTIRE viewport — no padding, no scaling down.
+          object-contain keeps the whole image visible without cropping so AOI
+          coordinates stay meaningful. */}
+      {imageError ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
+          <AlertTriangle size={36} className="text-warning" />
+          <p className="text-sm font-bold">تصویر محرک در دسترس نیست</p>
+          <p className="text-xs text-white/50">{stimulus?.url}</p>
+        </div>
+      ) : (
+        <img
+          key={stimulus?.url}
+          src={stimulus?.url}
+          alt={`محرک ${stimulus?.label}`}
+          onError={() => setImageError(true)}
+          draggable={false}
+          className="absolute inset-0 h-full w-full select-none object-contain"
+        />
+      )}
+
+      {/* Status controls float above the image so they never shrink it. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between bg-gradient-to-b from-black/75 to-transparent px-6 pb-12 pt-4">
+        <div className="pointer-events-auto flex items-center gap-3">
           <Camera size={20} className="text-primary" />
           <div>
             <p className="text-xs font-semibold text-white/60">جمعآوری داده</p>
@@ -212,48 +233,33 @@ export function CollectionOverlay({
         </div>
         <button
           onClick={abort}
-          className="flex h-11 items-center gap-2 rounded-xl bg-white/10 px-4 text-xs font-semibold transition-colors hover:bg-white/20"
+          className="pointer-events-auto flex h-11 items-center gap-2 rounded-xl bg-black/50 px-4 text-xs font-semibold backdrop-blur transition-colors hover:bg-black/70"
         >
           <X size={18} /> لغو (Esc)
         </button>
       </div>
 
-      <div className="h-1 w-full bg-white/10">
+      <div className="pointer-events-none absolute inset-x-0 top-[76px] z-10 h-1 bg-white/20">
         <div
           className="h-full bg-primary transition-[width] duration-100"
           style={{ width: `${((index + elapsed / 10000) / stimuli.length) * 100}%` }}
         />
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
-        {imageError ? (
-          <div className="flex flex-col items-center gap-3 text-center">
-            <AlertTriangle size={36} className="text-warning" />
-            <p className="text-sm font-bold">تصویر محرک در دسترس نیست</p>
-            <p className="text-xs text-white/50">{stimulus?.url}</p>
+      <div className="pointer-events-none absolute inset-x-0 bottom-6 z-10 flex justify-center">
+        <div className="flex items-center gap-4 rounded-pill bg-black/55 px-5 py-2 backdrop-blur">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full border-4 border-white/25">
+            <span className="nums text-sm font-bold">{remaining.toFixed(0)}</span>
           </div>
-        ) : (
-          <img
-            key={stimulus?.url}
-            src={stimulus?.url}
-            alt={`محرک ${stimulus?.label}`}
-            onError={() => setImageError(true)}
-            className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
-          />
-        )}
-        {sending ? (
-          <span className="absolute bottom-4 left-4 rounded-pill bg-white/10 px-3 py-1 text-[11px]">
-            در حال ارسال…
-          </span>
-        ) : null}
+          <p className="text-xs text-white/70">لطفاً تا پایان زمان به تصویر نگاه کنید</p>
+        </div>
       </div>
 
-      <div className="flex items-center justify-center gap-4 pb-6">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-white/15">
-          <span className="nums text-sm font-bold">{remaining.toFixed(0)}</span>
-        </div>
-        <p className="text-xs text-white/50">لطفاً تا پایان زمان به تصویر نگاه کنید</p>
-      </div>
+      {sending ? (
+        <span className="pointer-events-none absolute bottom-6 right-6 z-10 rounded-pill bg-black/55 px-3 py-1 text-[11px] backdrop-blur">
+          در حال ارسال…
+        </span>
+      ) : null}
 
       {video ? (
         <video
@@ -263,7 +269,7 @@ export function CollectionOverlay({
           autoPlay
           muted
           playsInline
-          className="pointer-events-none absolute bottom-4 left-4 h-20 w-28 rounded-lg object-cover opacity-30"
+          className="pointer-events-none absolute bottom-4 left-4 z-10 h-16 w-24 rounded-lg object-cover opacity-25"
         />
       ) : null}
     </div>
