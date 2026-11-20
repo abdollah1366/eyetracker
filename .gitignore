@@ -35,3 +35,23 @@ Thumbs.db
 build/
 dist/
 *.spec
+
+# ---- Node / frontend ----
+node_modules/
+webapp/frontend/dist/
+*.tsbuildinfo
+npm-debug.log*
+
+# ---- Webapp runtime data / secrets ----
+.env
+.env.local
+.env.*.local
+webapp/backend/artifacts/
+webapp/backend/artifacts/*
+webapp/backend/*.db
+webapp/backend/*.sqlite3
+
+# ---- Archives / backups ----
+*.zip
+*.rar
+*.7z

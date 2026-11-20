@@ -1,5 +1,9 @@
 # ADHD Webcam Eye-Tracking CDSS — Research Build
 
+> 🆕 **نسخه وب (جدید و کامل):** پیادهسازی کامل مطابق پایاننامه اکنون در پوشه [`webapp/`](webapp/README.md) است — فرانتاند React/RTL، بکاند FastAPI + PostgreSQL، احراز هویت و نقشها، Quality Gate الزامی، Conners/IVA-2،report PDF، XAI و Sync آفلاین. کد دسکتاپ قدیمی در ریشه مخزن حفظ شده است.
+> - شروع سریع: `cd webapp && docker compose up --build -d` سپس `http://localhost:8080`
+> - قراردادها: [`webapp/SPEC.md`](webapp/SPEC.md) · [`webapp/DESIGN.md`](webapp/DESIGN.md)
+
 این نسخه نمونه اولیه (pilot) نرم‌افزار است، هم‌راستا با پایان‌نامه
 «طراحی و توسعه سامانه پشتیبان تصمیم برای تشخیص ADHD مبتنی بر داده‌های
 ردیابی حرکات چشم».

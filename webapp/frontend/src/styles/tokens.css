@@ -1,0 +1,86 @@
+/*
+ * Design tokens — ADHD Eye-Tracking CDSS
+ * Exact palette from SPEC.md section 6. Light theme by default; a dark-ready
+ * override is provided via [data-theme='dark'] (not enabled by default).
+ */
+:root {
+  /* Brand */
+  --color-primary: #0e7490;
+  --color-primary-hover: #0b5f76;
+  --color-primary-active: #084e61;
+  --color-primary-soft: #e0f2f6;
+  --color-on-primary: #ffffff;
+
+  --color-accent: #d1390f;
+  --color-accent-hover: #b42f0c;
+  --color-accent-soft: #fbe9e4;
+
+  /* Neutrals */
+  --color-bg: #f7f8f8;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f4f4;
+  --color-border: #d6dadc;
+  --color-border-strong: #b9c0c2;
+  --color-text: #303536;
+  --color-text-muted: #5d6769;
+  --color-text-subtle: #8a9496;
+
+  /* Semantic */
+  --color-success: #15793a;
+  --color-success-soft: #e6f4ea;
+  --color-error: #bf2222;
+  --color-error-soft: #fdeaea;
+  --color-warning: #d08a11;
+  --color-warning-soft: #fcf3e2;
+  --color-info: #2270bf;
+  --color-info-soft: #e8f1fb;
+
+  /* Chrome */
+  --color-sidebar: #0f4757;
+  --color-sidebar-hover: #175d71;
+  --color-sidebar-text: #e6f1f4;
+
+  /* Radii */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-card: 0 1px 2px rgba(15, 71, 87, 0.04), 0 8px 24px rgba(15, 71, 87, 0.06);
+  --shadow-card-hover: 0 2px 4px rgba(15, 71, 87, 0.06), 0 12px 32px rgba(15, 71, 87, 0.1);
+  --shadow-modal: 0 24px 64px rgba(15, 71, 87, 0.24);
+
+  /* Typography */
+  --font-sans: 'Vazirmatn', 'Inter', system-ui, sans-serif;
+  --font-number: 'Inter', 'Vazirmatn', system-ui, sans-serif;
+
+  /* Motion */
+  --ease-clinical: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+
+  /* Layout */
+  --sidebar-width: 264px;
+  --topbar-height: 72px;
+  --disclaimer-height: 36px;
+}
+
+/* Dark-ready overrides (opt-in via data-theme on <html>). */
+[data-theme='dark'] {
+  --color-bg: #10262e;
+  --color-surface: #17343e;
+  --color-surface-2: #1d3f4a;
+  --color-border: #2b505b;
+  --color-border-strong: #3a6570;
+  --color-text: #e7eef0;
+  --color-text-muted: #a9bdc2;
+  --color-text-subtle: #77949c;
+  --color-primary-soft: #164c5a;
+  --color-success-soft: #16432a;
+  --color-error-soft: #4a1f1f;
+  --color-warning-soft: #4a3714;
+  --color-info-soft: #173b60;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.45);
+}
