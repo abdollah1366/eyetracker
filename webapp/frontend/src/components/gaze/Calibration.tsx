@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { CircleDot, Maximize2, X } from 'lucide-react';
 import type { Calibration, CalibrationPoint } from '../../lib/types';
 import { enterFullscreen, onViewportChange } from '../../lib/fullscreen';
+import { EyeOverlay } from './EyeOverlay';
 import {
   fitGazeMapping,
   medianVector,
@@ -183,6 +184,8 @@ export function CalibrationOverlay({
         />
       ) : null}
       <div className="pointer-events-none absolute inset-0 bg-[#061f27]/35" />
+      {/* Green pupil/eye guidance is visible during calibration only. */}
+      <EyeOverlay engine={engine} video={video} mirrored />
 
       <div className="absolute inset-x-0 top-0 flex items-center justify-between p-6">
         <div>

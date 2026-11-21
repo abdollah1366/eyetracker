@@ -264,17 +264,11 @@ export function CollectionOverlay({
         </span>
       ) : null}
 
-      {video ? (
-        <video
-          ref={(el) => {
-            if (el && el.srcObject !== video.srcObject) el.srcObject = video.srcObject;
-          }}
-          autoPlay
-          muted
-          playsInline
-          className="pointer-events-none absolute bottom-4 left-4 z-10 h-16 w-24 rounded-lg object-cover opacity-25"
-        />
-      ) : null}
+      {/* No camera preview and no landmarks here: gaze tracking keeps running
+          in the background, but the participant sees only the stimulus. */}
+      <span className="sr-only" aria-live="polite">
+        ردیابی چشم در پسزمینه فعال است
+      </span>
     </div>,
     document.body,
   );

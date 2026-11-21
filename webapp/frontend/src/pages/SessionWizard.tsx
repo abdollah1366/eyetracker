@@ -26,6 +26,7 @@ import { Badge } from '../components/ui/Badge';
 import { Spinner } from '../components/ui/Spinner';
 import { useToast } from '../components/ui/Toast';
 import { MediaPipeGaze } from '../components/gaze/MediaPipeGaze';
+import { EyeOverlay } from '../components/gaze/EyeOverlay';
 import { CalibrationOverlay } from '../components/gaze/Calibration';
 import { CollectionOverlay, type StimulusItem, type StimulusStat } from '../components/gaze/Collection';
 import { NotCalculated, QualityBadge } from '../components/QualityBadge';
@@ -161,9 +162,16 @@ export function SessionWizard() {
     setStage('calibration-overlay');
   };
 
-  const beginCollection = async () => {
-    if (!calibration || !participantId) return;
-    // Must run synchronously from the click handler to preserve user activation.
+  const beginCollection = async (cal: Calibration | null = calibration) => {
+    if (!cal || !participantId) return;
+    if (stimuli.length === 0) {
+      toast.error('هیچ محرکی یافت نشد؛ جمعآوری امکانپذیر نیست.');
+      void exitFullscreen();
+      setStage('calibration');
+      return;
+    }
+    // If this is called from the click handler, the user activation is still
+    // valid. On the automatic path we are already fullscreen, so this is a no-op.
     await enterFullscreen();
     setCreating(true);
     try {
@@ -174,7 +182,7 @@ export function SessionWizard() {
         // Same viewport the calibration targets were captured in.
         screen_width: window.innerWidth,
         screen_height: window.innerHeight,
-        calibration,
+        calibration: cal,
         started_at: new Date().toISOString(),
         client_meta: {
           user_agent: navigator.userAgent,
@@ -189,6 +197,8 @@ export function SessionWizard() {
       setStage('collection');
     } catch (err) {
       toast.error(apiErrorMessage(err));
+      void exitFullscreen();
+      setStage('calibration');
     } finally {
       setCreating(false);
     }
@@ -338,7 +348,15 @@ export function SessionWizard() {
           <CardHeader title="بررسی دوربین" subtitle="دوربین فعال شود و مدل تشخیص چهره بارگذاری گردد." />
           <div className="grid gap-6 md:grid-cols-2">
             <div className="relative aspect-video overflow-hidden rounded-xl bg-sidebar">
-              <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                style={{ transform: 'scaleX(-1)' }}
+                className="h-full w-full object-cover"
+              />
+              <EyeOverlay engine={engineRef.current} video={videoRef.current} mirrored />
               {cameraStatus !== 'ready' ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-sidebar/85 text-white">
                   <Camera size={36} className="text-white/70" />
@@ -410,7 +428,11 @@ export function SessionWizard() {
                 <p className="text-xs text-ink-muted">
                   کالیبراسیون ذخیره شد. برای نمایش محرکها در تمامصفحه، مرحله بعد را آغاز کنید.
                 </p>
-                <Button leftIcon={<ScanEye size={18} />} onClick={beginCollection} loading={creating}>
+                <Button
+                  leftIcon={<ScanEye size={18} />}
+                  onClick={() => void beginCollection()}
+                  loading={creating}
+                >
                   ادامه: آغاز جمعآوری ({stimuli.length} محرک)
                 </Button>
               </>
@@ -431,9 +453,12 @@ export function SessionWizard() {
           video={videoRef.current}
           onComplete={(cal) => {
             setCalibration(cal);
-            void exitFullscreen();
-            setStage('calibration');
-            toast.success('کالیبراسیون ۵ نقطهای تکمیل شد — برای ادامه، «آغاز جمعآوری» را بزنید.');
+            toast.success('کالیبراسیون ۵ نقطهای تکمیل شد — آغاز جمعآوری داده…');
+            // Stay in fullscreen and move straight to collection. No new user
+            // gesture is needed because we are already fullscreen here.
+            window.setTimeout(() => {
+              void beginCollection(cal);
+            }, 900);
           }}
           onCancel={() => {
             void exitFullscreen();

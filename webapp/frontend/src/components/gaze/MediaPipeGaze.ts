@@ -34,6 +34,13 @@ export interface GazeFeatures {
   right_iris_x: number;
   right_iris_y: number;
   face_detected: 1;
+  /** Normalized (0..1) video-space geometry, used ONLY for local visual feedback. */
+  overlay: {
+    leftIris: Point;
+    rightIris: Point;
+    leftEye: { x: number; y: number; w: number; h: number };
+    rightEye: { x: number; y: number; w: number; h: number };
+  };
 }
 
 type Point = { x: number; y: number };
@@ -47,6 +54,7 @@ interface NormalizedLandmarkLike {
 export class MediaPipeGaze {
   private landmarker: FaceLandmarker | null = null;
   private lastVideoTime = -1;
+  private lastTimestampMs = -1;
   private lastResult: { faceLandmarks: NormalizedLandmarkLike[][] } | null = null;
 
   get isReady(): boolean {
@@ -76,10 +84,13 @@ export class MediaPipeGaze {
     if (!this.landmarker || video.readyState < 2) return null;
 
     let result: { faceLandmarks: NormalizedLandmarkLike[][] };
+    // Several consumers (sampling loop + landmark overlay) may call extract
+    // in the same frame, so enforce strictly increasing timestamps centrally.
     if (video.currentTime !== this.lastVideoTime) {
       this.lastVideoTime = video.currentTime;
+      this.lastTimestampMs = Math.max(timestampMs, this.lastTimestampMs + 1);
       // Tasks Vision returns a richer type; we only consume faceLandmarks.
-      this.lastResult = this.landmarker.detectForVideo(video, timestampMs) as unknown as {
+      this.lastResult = this.landmarker.detectForVideo(video, this.lastTimestampMs) as unknown as {
         faceLandmarks: NormalizedLandmarkLike[][];
       };
     }
@@ -127,6 +138,27 @@ export class MediaPipeGaze {
     const rnormX = (ri.x - rlc.x) / rwidth;
     const rnormY = (ri.y - (rcv.y + rcv2.y) / 2) / rheight;
 
+    // Normalized geometry for the optional green eye/pupil overlay.
+    const meanNorm = (ids: number[]): Point => {
+      let sx = 0;
+      let sy = 0;
+      for (const id of ids) {
+        sx += lm[id].x;
+        sy += lm[id].y;
+      }
+      return { x: sx / ids.length, y: sy / ids.length };
+    };
+    const normalizedEyeBox = (
+      horizontal: [number, number],
+      vertical: [number, number],
+    ): { x: number; y: number; w: number; h: number } => {
+      const xs = [lm[horizontal[0]].x, lm[horizontal[1]].x];
+      const ys = [lm[vertical[0]].y, lm[vertical[1]].y];
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+    };
+
     return {
       feature: [lnormX, lnormY, rnormX, rnormY],
       left_iris_x: li.x,
@@ -134,6 +166,12 @@ export class MediaPipeGaze {
       right_iris_x: ri.x,
       right_iris_y: ri.y,
       face_detected: 1,
+      overlay: {
+        leftIris: meanNorm(LEFT_IRIS),
+        rightIris: meanNorm(RIGHT_IRIS),
+        leftEye: normalizedEyeBox(LEFT_EYE_CORNERS, LEFT_EYE_VERTICAL),
+        rightEye: normalizedEyeBox(RIGHT_EYE_CORNERS, RIGHT_EYE_VERTICAL),
+      },
     };
   }
 
@@ -142,6 +180,7 @@ export class MediaPipeGaze {
     this.landmarker = null;
     this.lastResult = null;
     this.lastVideoTime = -1;
+    this.lastTimestampMs = -1;
   }
 }
 
