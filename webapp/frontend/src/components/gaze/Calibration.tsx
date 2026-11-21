@@ -32,11 +32,15 @@ export function CalibrationOverlay({
   engine,
   video,
   onComplete,
+  onContinue,
+  status,
   onCancel,
 }: {
   engine: MediaPipeGaze | null;
   video: HTMLVideoElement | null;
   onComplete: (calibration: Calibration) => void;
+  onContinue: () => void;
+  status?: string | null;
   onCancel: () => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -50,6 +54,7 @@ export function CalibrationOverlay({
   const rafRef = useRef<number>(0);
   const phaseStartRef = useRef<number>(performance.now());
   const collectedRef = useRef<CalibrationPoint[]>([]);
+  const completedRef = useRef(false);
 
   // The wizard requests fullscreen on click; retry here if that was blocked.
   useEffect(() => {
@@ -86,6 +91,7 @@ export function CalibrationOverlay({
   }, [onCancel]);
 
   const finish = useCallback(() => {
+    if (completedRef.current) return;
     const points = collectedRef.current;
     if (points.length < MIN_POINTS) {
       setError(`حداقل ${MIN_POINTS} نقطه باید ثبت شود؛ فقط ${points.length} نقطه ثبت شد.`);
@@ -100,6 +106,7 @@ export function CalibrationOverlay({
         const [px, py] = predictScreen(p.feature, fit.coef);
         return { ...p, error_px: Math.hypot(px - p.target_x, py - p.target_y) };
       });
+      completedRef.current = true;
       onComplete({
         coef: fit.coef,
         mean_error_px: fit.meanErrorPx,
@@ -256,9 +263,14 @@ export function CalibrationOverlay({
           {phase === 'settle' ? 'روی نقطه تمرکز کنید…' : 'نگاه خود را ثابت نگه دارید'}
         </p>
         <p className="mt-1 text-[11px] text-white/45">برای لغو از کلید Esc استفاده کنید</p>
+        {status ? (
+          <p className="mt-3 rounded-xl bg-primary/25 px-4 py-2 text-xs font-bold text-white">
+            {status}
+          </p>
+        ) : null}
         {collected.length >= MIN_POINTS ? (
           <button
-            onClick={finish}
+            onClick={() => (completedRef.current ? onContinue() : finish())}
             className="pointer-events-auto mt-3 rounded-xl bg-success px-4 py-2 text-xs font-bold text-white shadow-lg"
           >
             اتمام کالیبراسیون و ادامه

@@ -96,6 +96,7 @@ export function SessionWizard() {
   const [session, setSession] = useState<Session | null>(null);
   const [result, setResult] = useState<Session | null>(null);
   const [creating, setCreating] = useState(false);
+  const [flowMessage, setFlowMessage] = useState<string | null>(null);
   const idempotencyKey = useMemo(() => newIdempotencyKey('session'), []);
 
   useEffect(() => {
@@ -178,6 +179,7 @@ export function SessionWizard() {
     // valid. On the automatic path we are already fullscreen, so this is a no-op.
     await enterFullscreen();
     setCreating(true);
+    setFlowMessage('در حال ایجاد جلسه و آمادهسازی محرکها…');
     try {
       const created = await sessionsApi.create({
         participant_id: participantId,
@@ -198,9 +200,12 @@ export function SessionWizard() {
         idempotency_key: idempotencyKey,
       });
       setSession(created);
+      setFlowMessage('جلسه ساخته شد — آغاز جمعآوری داده');
       setStage('collection');
     } catch (err) {
-      toast.error(apiErrorMessage(err));
+      const message = apiErrorMessage(err);
+      setFlowMessage(`خطا: ${message}`);
+      toast.error(message);
       void exitFullscreen();
       setStage('calibration');
     } finally {
@@ -415,6 +420,11 @@ export function SessionWizard() {
       {stage === 'calibration' ? (
         <Card>
           <CardHeader title="کالیبراسیون ۵ نقطهای" subtitle="چهار گوشه صفحه و سپس مرکز — در حالت تمامصفحه ثبت شد." />
+          {flowMessage ? (
+            <div className="mx-6 mt-4 rounded-xl bg-error-soft px-4 py-2 text-center text-xs font-semibold text-error">
+              {flowMessage}
+            </div>
+          ) : null}
           <div className="flex flex-col items-center gap-4 py-8 text-center">
             {calibration ? (
               <>
@@ -457,18 +467,13 @@ export function SessionWizard() {
           video={videoRef.current}
           onComplete={(cal) => {
             setCalibration(cal);
-            toast.success('کالیبراسیون ۵ نقطهای تکمیل شد — آغاز جمعآوری داده…');
-            // Stay in fullscreen and move straight to collection. No new user
-            // gesture is needed because we are already fullscreen here.
-            window.setTimeout(() => {
-              void beginCollection(cal);
-              // Safety net: if session creation never transitions, return to
-              // the review card instead of leaving the user stuck in fullscreen.
-              window.setTimeout(() => {
-                setStage((s) => (s === 'calibration-overlay' ? 'calibration' : s));
-              }, 3000);
-            }, 900);
+            toast.success('کالیبراسیون ۵ نقطهای تکمیل شد');
+            // Direct transition — no timers. We stay in fullscreen, so
+            // beginCollection does not need a new user gesture.
+            void beginCollection(cal);
           }}
+          onContinue={() => void beginCollection()}
+          status={flowMessage}
           onCancel={() => {
             void exitFullscreen();
             setStage('calibration');
