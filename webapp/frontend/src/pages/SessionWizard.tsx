@@ -97,6 +97,7 @@ export function SessionWizard() {
   const [result, setResult] = useState<Session | null>(null);
   const [creating, setCreating] = useState(false);
   const [flowMessage, setFlowMessage] = useState<string | null>(null);
+  const collectionStartedRef = useRef(false);
   const idempotencyKey = useMemo(() => newIdempotencyKey('session'), []);
 
   useEffect(() => {
@@ -175,9 +176,10 @@ export function SessionWizard() {
       setStage('calibration');
       return;
     }
-    // If this is called from the click handler, the user activation is still
-    // valid. On the automatic path we are already fullscreen, so this is a no-op.
-    await enterFullscreen();
+    // NEVER await fullscreen here: in some browsers the promise stays pending
+    // when the call is made outside a direct user gesture, which would block
+    // the whole transition. We are already fullscreen on the automatic path.
+    void enterFullscreen();
     setCreating(true);
     setFlowMessage('در حال ایجاد جلسه و آمادهسازی محرکها…');
     try {
@@ -199,10 +201,12 @@ export function SessionWizard() {
         },
         idempotency_key: idempotencyKey,
       });
+      collectionStartedRef.current = true;
       setSession(created);
       setFlowMessage('جلسه ساخته شد — آغاز جمعآوری داده');
       setStage('collection');
     } catch (err) {
+      collectionStartedRef.current = true;
       const message = apiErrorMessage(err);
       setFlowMessage(`خطا: ${message}`);
       toast.error(message);
@@ -467,10 +471,17 @@ export function SessionWizard() {
           video={videoRef.current}
           onComplete={(cal) => {
             setCalibration(cal);
+            collectionStartedRef.current = false;
+            setFlowMessage('کالیبراسیون تکمیل شد — در حال شروع جمعآوری…');
             toast.success('کالیبراسیون ۵ نقطهای تکمیل شد');
-            // Direct transition — no timers. We stay in fullscreen, so
-            // beginCollection does not need a new user gesture.
             void beginCollection(cal);
+            // Last-resort escape hatch so the screen can never stay frozen.
+            window.setTimeout(() => {
+              if (collectionStartedRef.current) return;
+              setFlowMessage('خطا: انتقال به جمعآوری ناموفق بود. لطفاً دوباره تلاش کنید.');
+              void exitFullscreen();
+              setStage('calibration');
+            }, 4000);
           }}
           onContinue={() => void beginCollection()}
           status={flowMessage}
