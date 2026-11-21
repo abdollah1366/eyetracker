@@ -374,10 +374,10 @@ export function SessionWizard() {
                 ) : (
                   <Button
                     leftIcon={<ScanEye size={18} />}
-                    onClick={() => setStage('calibration')}
+                    onClick={startCalibration}
                     disabled={stimuli.length === 0}
                   >
-                    آغاز کالیبراسیون
+                    آغاز کالیبراسیون (تمامصفحه)
                   </Button>
                 )}
               </div>
@@ -392,7 +392,7 @@ export function SessionWizard() {
       {/* ---- calibration ---- */}
       {stage === 'calibration' ? (
         <Card>
-          <CardHeader title="کالیبراسیون ۹ نقطهای" subtitle="به ترتیب روی ۹ نقطه نمایشدادهشده نگاه کنید." />
+          <CardHeader title="کالیبراسیون ۵ نقطهای" subtitle="چهار گوشه صفحه و سپس مرکز — در حالت تمامصفحه ثبت شد." />
           <div className="flex flex-col items-center gap-4 py-8 text-center">
             {calibration ? (
               <>
@@ -407,8 +407,11 @@ export function SessionWizard() {
                     <p className="nums mt-1 text-lg font-bold text-ink">{formatDecimal(calibration.median_error_px, 1)} px</p>
                   </div>
                 </div>
+                <p className="text-xs text-ink-muted">
+                  کالیبراسیون ذخیره شد. برای نمایش محرکها در تمامصفحه، مرحله بعد را آغاز کنید.
+                </p>
                 <Button leftIcon={<ScanEye size={18} />} onClick={beginCollection} loading={creating}>
-                  آغاز جمعآوری ({stimuli.length} محرک)
+                  ادامه: آغاز جمعآوری ({stimuli.length} محرک)
                 </Button>
               </>
             ) : (
@@ -430,6 +433,7 @@ export function SessionWizard() {
             setCalibration(cal);
             void exitFullscreen();
             setStage('calibration');
+            toast.success('کالیبراسیون ۵ نقطهای تکمیل شد — برای ادامه، «آغاز جمعآوری» را بزنید.');
           }}
           onCancel={() => {
             void exitFullscreen();

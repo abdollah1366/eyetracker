@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CircleDot, X } from 'lucide-react';
+import { CircleDot, Maximize2, X } from 'lucide-react';
 import type { Calibration, CalibrationPoint } from '../../lib/types';
 import { enterFullscreen, onViewportChange } from '../../lib/fullscreen';
 import {
@@ -43,6 +43,7 @@ export function CalibrationOverlay({
   const [collected, setCollected] = useState<CalibrationPoint[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ w: window.innerWidth, h: window.innerHeight });
+  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
   const featuresRef = useRef<number[][]>([]);
   const rafRef = useRef<number>(0);
   const phaseStartRef = useRef<number>(performance.now());
@@ -58,6 +59,7 @@ export function CalibrationOverlay({
   useEffect(
     () =>
       onViewportChange(() => {
+        setIsFullscreen(Boolean(document.fullscreenElement));
         setViewport({ w: window.innerWidth, h: window.innerHeight });
       }),
     [],
@@ -182,13 +184,23 @@ export function CalibrationOverlay({
             نقطه {index + 1} از {targets.length}
           </p>
         </div>
-        <button
-          onClick={onCancel}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
-          aria-label="لغو کالیبراسیون"
-        >
-          <X size={22} />
-        </button>
+        <div className="flex items-center gap-2">
+          {!isFullscreen ? (
+            <button
+              onClick={() => void enterFullscreen()}
+              className="flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-bold text-white shadow-lg"
+            >
+              <Maximize2 size={18} /> تمامصفحه
+            </button>
+          ) : null}
+          <button
+            onClick={onCancel}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+            aria-label="لغو کالیبراسیون"
+          >
+            <X size={22} />
+          </button>
+        </div>
       </div>
 
       <div className="absolute inset-x-0 top-[76px] px-6">
@@ -215,6 +227,9 @@ export function CalibrationOverlay({
             size={phase === 'dwell' ? 34 : 28}
             className={phase === 'dwell' ? 'text-primary' : 'text-white/70'}
           />
+          <span className="nums absolute -bottom-7 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white/80">
+            {index + 1}/{targets.length}
+          </span>
         </div>
       </div>
 
