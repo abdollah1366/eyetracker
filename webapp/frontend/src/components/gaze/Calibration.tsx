@@ -91,21 +91,25 @@ export function CalibrationOverlay({
       setError(`حداقل ${MIN_POINTS} نقطه باید ثبت شود؛ فقط ${points.length} نقطه ثبت شد.`);
       return;
     }
-    const fit = fitGazeMapping(
-      points.map((p) => p.feature),
-      points.map((p) => [p.target_x, p.target_y]),
-    );
-    const withErrors: CalibrationPoint[] = points.map((p) => {
-      const [px, py] = predictScreen(p.feature, fit.coef);
-      return { ...p, error_px: Math.hypot(px - p.target_x, py - p.target_y) };
-    });
-    onComplete({
-      coef: fit.coef,
-      mean_error_px: fit.meanErrorPx,
-      median_error_px: fit.medianErrorPx,
-      points: withErrors,
-      created_at: new Date().toISOString(),
-    });
+    try {
+      const fit = fitGazeMapping(
+        points.map((p) => p.feature),
+        points.map((p) => [p.target_x, p.target_y]),
+      );
+      const withErrors: CalibrationPoint[] = points.map((p) => {
+        const [px, py] = predictScreen(p.feature, fit.coef);
+        return { ...p, error_px: Math.hypot(px - p.target_x, py - p.target_y) };
+      });
+      onComplete({
+        coef: fit.coef,
+        mean_error_px: fit.meanErrorPx,
+        median_error_px: fit.medianErrorPx,
+        points: withErrors,
+        created_at: new Date().toISOString(),
+      });
+    } catch (e) {
+      setError(`خطا در محاسبه کالیبراسیون: ${e instanceof Error ? e.message : 'نامشخص'}`);
+    }
   }, [onComplete]);
 
   // Sample features during the dwell phase.
@@ -148,8 +152,9 @@ export function CalibrationOverlay({
         setCollected(updated);
         if (index + 1 >= targets.length) {
           window.clearInterval(id);
-          // finish reads the ref populated above.
-          window.setTimeout(finish, 0);
+          // The ref is already updated synchronously — call finish directly
+          // so no queued timer can be lost during the fullscreen transition.
+          finish();
         } else {
           setIndex((i) => i + 1);
           setPhase('settle');
@@ -192,6 +197,9 @@ export function CalibrationOverlay({
           <p className="text-xs font-semibold text-white/60">کالیبراسیون ۵ نقطهای — چهار گوشه و مرکز</p>
           <p className="mt-1 text-sm font-bold">
             نقطه {index + 1} از {targets.length}
+          </p>
+          <p className="nums mt-0.5 text-[11px] text-primary">
+            ثبت شده: {collected.length} / {MIN_POINTS}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -248,6 +256,14 @@ export function CalibrationOverlay({
           {phase === 'settle' ? 'روی نقطه تمرکز کنید…' : 'نگاه خود را ثابت نگه دارید'}
         </p>
         <p className="mt-1 text-[11px] text-white/45">برای لغو از کلید Esc استفاده کنید</p>
+        {collected.length >= MIN_POINTS ? (
+          <button
+            onClick={finish}
+            className="pointer-events-auto mt-3 rounded-xl bg-success px-4 py-2 text-xs font-bold text-white shadow-lg"
+          >
+            اتمام کالیبراسیون و ادامه
+          </button>
+        ) : null}
       </div>
 
       {error ? (

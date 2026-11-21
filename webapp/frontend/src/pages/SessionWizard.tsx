@@ -163,7 +163,11 @@ export function SessionWizard() {
   };
 
   const beginCollection = async (cal: Calibration | null = calibration) => {
-    if (!cal || !participantId) return;
+    if (!cal || !participantId) {
+      void exitFullscreen();
+      setStage('calibration');
+      return;
+    }
     if (stimuli.length === 0) {
       toast.error('هیچ محرکی یافت نشد؛ جمعآوری امکانپذیر نیست.');
       void exitFullscreen();
@@ -458,6 +462,11 @@ export function SessionWizard() {
             // gesture is needed because we are already fullscreen here.
             window.setTimeout(() => {
               void beginCollection(cal);
+              // Safety net: if session creation never transitions, return to
+              // the review card instead of leaving the user stuck in fullscreen.
+              window.setTimeout(() => {
+                setStage((s) => (s === 'calibration-overlay' ? 'calibration' : s));
+              }, 3000);
             }, 900);
           }}
           onCancel={() => {
