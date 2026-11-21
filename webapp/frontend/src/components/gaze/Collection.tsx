@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Camera, X } from 'lucide-react';
 import { sessionsApi } from '../../lib/api';
 import { enqueueEvent, newIdempotencyKey } from '../../lib/idb';
@@ -198,7 +199,9 @@ export function CollectionOverlay({
 
   if (aborted) return null;
 
-  return (
+  // Portal to <body> so the transformed AppShell wrapper cannot turn this
+  // fixed overlay into a small centred box.
+  return createPortal(
     <div className="fixed inset-0 z-[70] overflow-hidden bg-black text-white" dir="rtl">
       {/* The stimulus occupies the ENTIRE viewport — no padding, no scaling down.
           object-contain keeps the whole image visible without cropping so AOI
@@ -272,6 +275,7 @@ export function CollectionOverlay({
           className="pointer-events-none absolute bottom-4 left-4 z-10 h-16 w-24 rounded-lg object-cover opacity-25"
         />
       ) : null}
-    </div>
+    </div>,
+    document.body,
   );
 }

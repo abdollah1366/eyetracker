@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CircleDot, Maximize2, X } from 'lucide-react';
 import type { Calibration, CalibrationPoint } from '../../lib/types';
 import { enterFullscreen, onViewportChange } from '../../lib/fullscreen';
@@ -162,9 +163,13 @@ export function CalibrationOverlay({
 
   const progress = ((index + (phase === 'dwell' ? 1 : 0)) / targets.length) * 100;
 
-  return (
-    <div className="fixed inset-0 z-[70] bg-[#061f27] text-white" dir="rtl">
-      {/* live camera preview stays tiny in the corner — frames never uploaded */}
+  // Portal to <body>: AppShell has an animated (transformed) wrapper, which
+  // would otherwise become the containing block for `position: fixed` and
+  // shrink this overlay to a box in the middle of the page.
+  return createPortal(
+    <div className="fixed inset-0 z-[70] overflow-hidden bg-[#061f27] text-white" dir="rtl">
+      {/* LIVE CAMERA FILLS THE WHOLE SCREEN. Only local display — frames are
+          never uploaded; MediaPipe reads them directly from this element. */}
       {video ? (
         <video
           ref={(el) => {
@@ -173,9 +178,11 @@ export function CalibrationOverlay({
           autoPlay
           muted
           playsInline
-          className="pointer-events-none absolute bottom-4 left-4 h-24 w-32 rounded-lg object-cover opacity-40"
+          style={{ transform: 'scaleX(-1)' }}
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70"
         />
       ) : null}
+      <div className="pointer-events-none absolute inset-0 bg-[#061f27]/35" />
 
       <div className="absolute inset-x-0 top-0 flex items-center justify-between p-6">
         <div>
@@ -252,6 +259,7 @@ export function CalibrationOverlay({
       <span className="sr-only" aria-live="polite">
         {collected.length} نقطه ثبت شد
       </span>
-    </div>
+    </div>,
+    document.body,
   );
 }
