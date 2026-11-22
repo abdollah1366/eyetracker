@@ -219,7 +219,7 @@ def test_invalid_quality_has_no_features_and_no_risk(client: TestClient) -> None
         set(("key", "title", "content", "status")).issubset(section) for section in sections
     )
     assert all(
-        section["status"] in {"OK", "NOT_CALCULATED", "NO_DATA"} for section in sections
+        section["status"] in {"OK", "PENDING", "NOT_CALCULATED", "NO_DATA"} for section in sections
     )
 
 
@@ -431,3 +431,123 @@ def test_iva_cpt_rejects_partial_results(client: TestClient) -> None:
         json={"results": [{"trial_index": 0, "reaction_ms": 400, "response_count": 1}]},
     )
     assert response.status_code == 422, response.text
+
+
+def test_model_readiness_gate_and_pending_report(client: TestClient) -> None:
+    headers = _headers(client)
+    readiness = client.get("/api/v1/models/readiness", headers=headers)
+    assert readiness.status_code == 200, readiness.text
+    body = readiness.json()
+    assert body["required_participants"] == 100
+    assert body["labeled_participants"] < 100
+    assert body["ready"] is False
+    assert "۱۰۰" in body["message"]
+
+    participant_id = _participant(client, "P-SMOKE-MODEL-PENDING")
+    created = client.post(
+        "/api/v1/sessions",
+        headers=headers,
+        json={
+            "participant_id": participant_id,
+            "label": "ADHD",
+            "screen_width": 1920,
+            "screen_height": 1080,
+            "calibration": {"coef": [[0.0]], "mean_error_px": 10.0, "points": []},
+            "idempotency_key": "smoke-session-model-pending-1",
+        },
+    )
+    assert created.status_code == 201, created.text
+    session_id = created.json()["id"]
+    samples = client.post(
+        f"/api/v1/sessions/{session_id}/samples",
+        headers=headers,
+        json={
+            "stimulus": "1.jpg",
+            "samples": [
+                {
+                    "timestamp": index * 0.1,
+                    "gaze_x": 600.0 + index,
+                    "gaze_y": 500.0,
+                    "gaze_valid": True,
+                    "brightness": 128.0,
+                }
+                for index in range(30)
+            ],
+        },
+    )
+    assert samples.status_code == 200, samples.text
+    completed = client.post(
+        f"/api/v1/sessions/{session_id}/complete", headers=headers, json={}
+    )
+    assert completed.status_code == 200, completed.text
+    assert completed.json()["status"] == "VALID"
+    # Valid quality but no model: no risk, no "insufficient quality" message.
+    assert completed.json()["risk"] is None
+    assert completed.json()["message"] is None
+    assert completed.json()["features"] is not None
+
+    report = client.get(f"/api/v1/reports/session/{session_id}", headers=headers)
+    assert report.status_code == 200, report.text
+    sections = {section["key"]: section for section in report.json()["sections"]}
+    model = sections["model"]
+    assert model["status"] == "PENDING", model
+    assert "مدل در حال تکمیل" in model["content"]["message"]
+    assert model["content"]["features"] is not None
+    assert sections["xai"]["status"] == "PENDING"
+    assert sections["conclusion"]["status"] == "PENDING"
+
+
+def test_global_heatmap_averages_all_stimuli(client: TestClient) -> None:
+    headers = _headers(client)
+    participant_id = _participant(client, "P-SMOKE-GLOBAL-HEATMAP")
+    created = client.post(
+        "/api/v1/sessions",
+        headers=headers,
+        json={
+            "participant_id": participant_id,
+            "label": "ADHD",
+            "screen_width": 1920,
+            "screen_height": 1080,
+            "calibration": {"coef": [[0.0]], "mean_error_px": 10.0, "points": []},
+            "idempotency_key": "smoke-session-global-heatmap-1",
+        },
+    )
+    assert created.status_code == 201, created.text
+    session_id = created.json()["id"]
+    for stimulus, x, y in (("1.jpg", 960.0, 540.0), ("2.jpg", 480.0, 270.0)):
+        response = client.post(
+            f"/api/v1/sessions/{session_id}/samples",
+            headers=headers,
+            json={
+                "stimulus": stimulus,
+                "samples": [
+                    {
+                        "timestamp": index * 0.1,
+                        "gaze_x": x,
+                        "gaze_y": y,
+                        "gaze_valid": True,
+                        "brightness": 128.0,
+                    }
+                    for index in range(10)
+                ],
+            },
+        )
+        assert response.status_code == 200, response.text
+
+    overall = client.get("/api/v1/heatmap/global", headers=headers)
+    assert overall.status_code == 200, overall.text
+    body = overall.json()
+    assert body["grid_width"] == 48
+    assert body["grid_height"] == 27
+    assert len(body["grid"]) == 27
+    assert all(len(row) == 48 for row in body["grid"])
+    assert body["point_count"] >= 20
+    assert body["session_count"] >= 1
+    assert {"1.jpg", "2.jpg"}.issubset(set(body["stimuli"]))
+    assert max(value for row in body["grid"] for value in row) == 1.0
+
+    filtered = client.get("/api/v1/heatmap/global", headers=headers, params={"stimulus": "1.jpg"})
+    assert filtered.status_code == 200, filtered.text
+    filtered_body = filtered.json()
+    assert filtered_body["stimuli"] == ["1.jpg"]
+    assert filtered_body["point_count"] < body["point_count"]

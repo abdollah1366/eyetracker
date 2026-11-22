@@ -8,6 +8,7 @@ import {
   Eye,
   LayoutDashboard,
   LogOut,
+  Layers,
   Menu,
   RefreshCw,
   Settings,
@@ -25,6 +26,7 @@ const navItems = [
   { to: '/assessments', label: 'ارزیابیها', icon: ClipboardList },
   { to: '/sessions/new', label: 'جلسه جدید', icon: Eye },
   { to: '/models', label: 'آزمایشگاه مدل', icon: BrainCircuit },
+  { to: '/heatmap', label: 'نقشه حرارتی کلی', icon: Layers },
   { to: '/sync', label: 'مرکز همگامسازی', icon: RefreshCw },
 ];
 

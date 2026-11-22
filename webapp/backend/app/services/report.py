@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models import Assessment, EyeTrackingSession
-from app.services.ml import DISCLAIMER, NOT_CALCULATED_MESSAGE, NOT_TRAINED_MESSAGE
+from app.services.ml import DISCLAIMER, MODEL_PENDING_MESSAGE, NOT_CALCULATED_MESSAGE
 
 # Section keys and RTL titles, in the order required by the thesis report.
 SECTION_TITLES: tuple[tuple[str, str], ...] = (
@@ -127,8 +127,10 @@ def build_report(db: Session, session_id: int) -> dict[str, Any] | None:
         conclusion_text = NOT_CALCULATED_MESSAGE
         conclusion_status = "NOT_CALCULATED"
     else:
-        conclusion_text = NOT_TRAINED_MESSAGE
-        conclusion_status = "NO_DATA"
+        # No model yet is an expected research phase, not a failed result.
+        # Raw quality/feature values are still present in the report sections.
+        conclusion_text = MODEL_PENDING_MESSAGE
+        conclusion_status = "PENDING"
 
     titles = dict(SECTION_TITLES)
     sections: list[dict[str, Any]] = [
@@ -214,16 +216,20 @@ def build_report(db: Session, session_id: int) -> dict[str, Any] | None:
     elif quality_status != "VALID":
         model_status = "NOT_CALCULATED"
     else:
-        model_status = "NO_DATA"
+        model_status = "PENDING"
     sections.append(
         _section(
             "model",
             {
                 "risk": risk,
-                "status": "AVAILABLE" if risk else "NOT_CALCULATED",
-                "message": None if risk else (
-                    NOT_CALCULATED_MESSAGE if quality_status != "VALID" else NOT_TRAINED_MESSAGE
+                "status": "AVAILABLE" if risk else (
+                    "NOT_CALCULATED" if quality_status != "VALID" else "AWAITING_MODEL"
                 ),
+                "message": None if risk else (
+                    NOT_CALCULATED_MESSAGE if quality_status != "VALID" else MODEL_PENDING_MESSAGE
+                ),
+                # Raw values remain available even without a trained model.
+                "features": features,
             },
             model_status,
             titles,
@@ -235,9 +241,13 @@ def build_report(db: Session, session_id: int) -> dict[str, Any] | None:
             "xai",
             {
                 "contributions": risk["xai"] if risk else [],
-                "message": None if risk else NOT_CALCULATED_MESSAGE,
+                "message": None if risk else (
+                    NOT_CALCULATED_MESSAGE if quality_status != "VALID" else MODEL_PENDING_MESSAGE
+                ),
             },
-            "OK" if risk and risk["xai"] else "NOT_CALCULATED",
+            "OK" if risk and risk["xai"] else (
+                "NOT_CALCULATED" if quality_status != "VALID" else "PENDING"
+            ),
             titles,
         )
     )

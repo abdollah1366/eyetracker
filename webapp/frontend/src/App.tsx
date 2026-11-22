@@ -10,6 +10,7 @@ import { SessionWizard } from './pages/SessionWizard';
 import { SessionDetail } from './pages/SessionDetail';
 import { Assessments } from './pages/Assessments';
 import { ModelLab } from './pages/ModelLab';
+import { GlobalHeatmapPage } from './pages/GlobalHeatmapPage';
 import { Admin } from './pages/Admin';
 import { SyncCenter } from './pages/SyncCenter';
 
@@ -36,6 +37,7 @@ export function App() {
               <Route path="/sessions/:id" element={<SessionDetail />} />
               <Route path="/assessments" element={<Assessments />} />
               <Route path="/models" element={<ModelLab />} />
+              <Route path="/heatmap" element={<GlobalHeatmapPage />} />
               <Route
                 path="/admin"
                 element={

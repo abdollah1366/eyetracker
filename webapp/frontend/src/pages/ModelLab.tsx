@@ -26,12 +26,12 @@ export function ModelLab() {
   const [versions, setVersions] = useState<ModelVersion[]>([]);
   const [metrics, setMetrics] = useState<ModelMetrics | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [minSessions, setMinSessions] = useState(20);
+  const [minSessions, setMinSessions] = useState(100);
   const [training, setTraining] = useState(false);
   const [loading, setLoading] = useState(true);
   const [card, setCard] = useState<ModelVersion | null>(null);
   const [predictSession, setPredictSession] = useState('');
-  const [prediction, setPrediction] = useState<{ risk: XAIEntry[]; probability: number | null; version: string } | null>(null);
+  const [prediction, setPrediction] = useState<{ risk: XAIEntry[]; probability: number | null; version: string; message?: string | null } | null>(null);
   const [predicting, setPredicting] = useState(false);
 
   const load = () => {
@@ -84,6 +84,7 @@ export function ModelLab() {
         risk: res.xai ?? res.risk?.xai ?? [],
         probability: res.risk?.probability ?? null,
         version: res.version,
+        message: res.message,
       });
     } catch (err) {
       toast.error(apiErrorMessage(err));
@@ -213,8 +214,8 @@ export function ModelLab() {
           <div className="flex items-start gap-3 rounded-xl border border-warning/25 bg-warning-soft/50 p-4">
             <ShieldAlert size={20} className="mt-0.5 shrink-0 text-warning" />
             <p className="text-[11px] leading-6 text-ink-muted">
-              احتمالهای مدل تنها پس از کالیبراسیون و در صورتی معتبراند که کیفیت جلسه «معتبر» باشد.
-              در غیر اینصورت نتیجه بهصورت «Not Calculated» نمایش داده میشود.
+              احتمال مدل تنها پس از تکمیل ۱۰۰ مراجع برچسبخورده، آموزش مدل و کیفیت معتبر جلسه نمایش داده میشود.
+              تا آن زمان تنها مقادیر خام کیفیت و ویژگیها ارائه میشود و نتیجه «نامعتبر» تلقی نمیشود.
             </p>
           </div>
           {card?.metrics?.calibration ? (
@@ -244,8 +245,16 @@ export function ModelLab() {
           </div>
           {prediction ? (
             <div className="mt-4 rounded-xl border border-primary/20 bg-primary-soft/40 p-4">
-              <p className="text-xs font-bold text-ink">احتمال: <span className="nums">{formatPercent(prediction.probability)}</span></p>
-              <p className="mt-1 text-[11px] text-ink-muted">نسخه: {prediction.version}</p>
+              {prediction.probability != null ? (
+                <>
+                  <p className="text-xs font-bold text-ink">احتمال: <span className="nums">{formatPercent(prediction.probability)}</span></p>
+                  <p className="mt-1 text-[11px] text-ink-muted">نسخه: {prediction.version}</p>
+                </>
+              ) : (
+                <p className="text-xs leading-6 text-ink-muted">
+                  {prediction.message ?? 'مدل در حال تکمیل است؛ احتمالی محاسبه نمیشود.'}
+                </p>
+              )}
               {prediction.risk.length ? (
                 <ul className="mt-3 space-y-1 text-[11px]" dir="ltr">
                   {prediction.risk.map((x, i) => (

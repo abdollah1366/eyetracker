@@ -22,7 +22,7 @@ import {
 } from 'recharts';
 import { asItems, modelsApi, participantsApi, sessionsApi } from '../lib/api';
 import { codeLabel, enNumber, formatDateTime } from '../lib/format';
-import type { ModelVersion, Participant, Session } from '../lib/types';
+import type { ModelReadiness, ModelVersion, Participant, Session } from '../lib/types';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { Card, CardHeader } from '../components/ui/Card';
@@ -42,6 +42,7 @@ export function Dashboard() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [models, setModels] = useState<ModelVersion[]>([]);
+  const [readiness, setReadiness] = useState<ModelReadiness | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,11 +51,13 @@ export function Dashboard() {
       sessionsApi.list(),
       participantsApi.list({ limit: 1000 }),
       modelsApi.list(),
-    ]).then(([s, p, m]) => {
+      modelsApi.readiness(),
+    ]).then(([s, p, m, r]) => {
       if (!active) return;
       if (s.status === 'fulfilled') setSessions(asItems(s.value));
       if (p.status === 'fulfilled') setParticipants(asItems(p.value));
       if (m.status === 'fulfilled') setModels(asItems(m.value));
+      if (r.status === 'fulfilled') setReadiness(r.value);
       setLoading(false);
     });
     return () => {
@@ -125,12 +128,20 @@ export function Dashboard() {
         title="داشبورد"
         subtitle="خلاصهای از وضعیت جلسات، شرکتکنندگان و مدلهای ثبتشده در سامانه."
         actions={
-          <Link
-            to="/sessions/new"
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover"
-          >
-            <Eye size={18} className="flip-rtl" /> جلسه جدید
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to="/heatmap"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-semibold text-ink transition-colors hover:bg-surface-2"
+            >
+              <Activity size={18} className="flip-rtl" /> نقشه حرارتی کلی
+            </Link>
+            <Link
+              to="/sessions/new"
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover"
+            >
+              <Eye size={18} className="flip-rtl" /> جلسه جدید
+            </Link>
+          </div>
         }
       />
 
@@ -160,6 +171,7 @@ export function Dashboard() {
         <StatCard
           label="نسخههای مدل"
           value={loading ? '—' : enNumber(models.length)}
+          hint={readiness ? `${enNumber(readiness.labeled_participants)}/${enNumber(readiness.required_participants)} مراجع برچسبخورده` : undefined}
           icon={<BrainCircuit size={20} />}
           loading={loading}
           tone="accent"

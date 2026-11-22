@@ -29,6 +29,8 @@ import { EyeOverlay } from '../components/gaze/EyeOverlay';
 import { CalibrationOverlay } from '../components/gaze/Calibration';
 import { CollectionOverlay, type StimulusItem, type StimulusStat } from '../components/gaze/Collection';
 import { NotCalculated, QualityBadge } from '../components/QualityBadge';
+import { ModelPending } from '../components/ModelPending';
+import { RawValues } from '../components/RawValues';
 
 type Stage = 'consent' | 'camera' | 'calibration' | 'calibration-overlay' | 'collection' | 'result';
 
@@ -43,7 +45,7 @@ const STAGES: Array<{ key: Stage; label: string }> = [
 /** Upper bound only — we never fabricate a stimulus; we just look for files. */
 const MAX_STIMULI_SCAN = 12;
 /** Visible in the calibration overlay — proves which build the browser loaded. */
-const BUILD_TAG = 'v2026-11-22-e';
+const BUILD_TAG = 'v2026-11-22-f';
 
 /** Honestly probe which stimulus files are actually present in /stimuli/ADHD/.
  *  The protocol target is derived from the count found (e.g. 9 images → 9). */
@@ -561,14 +563,22 @@ export function SessionWizard() {
               </div>
             ) : null}
 
-            {result.quality?.status === 'VALID' && result.risk?.probability != null ? (
-              <div className="rounded-xl border border-primary/20 bg-primary-soft/60 p-4">
-                <p className="text-xs font-bold text-ink">احتمال مدل</p>
-                <p className="nums mt-1 text-2xl font-extrabold text-primary">{formatPercent(result.risk.probability)}</p>
-                <p className="mt-1 text-[11px] text-ink-muted">نسخه مدل: {result.risk.version}</p>
+            {result.quality?.status === 'VALID' ? (
+              <div className="space-y-5">
+                {result.risk?.probability != null ? (
+                  <div className="rounded-xl border border-primary/20 bg-primary-soft/60 p-4">
+                    <p className="text-xs font-bold text-ink">احتمال مدل</p>
+                    <p className="nums mt-1 text-2xl font-extrabold text-primary">{formatPercent(result.risk.probability)}</p>
+                    <p className="mt-1 text-[11px] text-ink-muted">نسخه مدل: {result.risk.version}</p>
+                  </div>
+                ) : (
+                  /* Model forming: withhold ONLY the probability; raw values stay visible. */
+                  <ModelPending compact />
+                )}
+                <RawValues quality={result.quality} features={result.features} />
               </div>
             ) : (
-              <NotCalculated reason="کیفیت داده معتبر نیست یا مدل در دسترس نمیباشد." />
+              <NotCalculated reason="کیفیت داده جلسه معتبر نیست؛ احتمال و ویژگیهای مدل محاسبه نمیشود." />
             )}
 
             <div className="flex flex-wrap gap-3">

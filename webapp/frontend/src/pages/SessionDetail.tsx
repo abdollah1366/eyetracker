@@ -11,6 +11,8 @@ import { Spinner } from '../components/ui/Spinner';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Heatmap } from '../components/gaze/Heatmap';
 import { NotCalculated, QualityBadge } from '../components/QualityBadge';
+import { ModelPending, ModelPendingBadge } from '../components/ModelPending';
+import { RawValues } from '../components/RawValues';
 
 export function SessionDetail() {
   const { id } = useParams<{ id: string }>();
@@ -168,9 +170,11 @@ export function SessionDetail() {
         )}
       </Card>
 
-      {/* risk + XAI — only when quality VALID and backend returned them */}
+      {/* risk + XAI — only when quality VALID and a real model exists.
+          Until the 100-participant cohort is complete we show progress + raw
+          values instead of an error-like "not calculated" message. */}
       <Card className="mt-5">
-        <CardHeader title="نتیجه مدل و تفسیر" subtitle="نمایش تنها در صورت کیفیت معتبر و وجود مدل" />
+        <CardHeader title="نتیجه مدل و تفسیر" subtitle="احتمال تنها پس از تکمیل مدل و کیفیت معتبر نمایش داده میشود" />
         {riskAllowed ? (
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-4 rounded-xl border border-primary/20 bg-primary-soft/50 p-4">
@@ -208,8 +212,16 @@ export function SessionDetail() {
               <p className="text-[11px] text-ink-subtle">{session.risk.disclaimer}</p>
             ) : null}
           </div>
+        ) : qualityValid ? (
+          <div className="space-y-5">
+            <ModelPending compact />
+            <p className="text-[11px] text-ink-muted">
+              تا این مرحله تنها مقادیر خام کیفیت و ویژگیها ارائه میشود؛ احتمال پیشبینی محاسبه نمیشود.
+            </p>
+            <RawValues quality={session.quality} features={features} />
+          </div>
         ) : (
-          <NotCalculated reason="کیفیت جلسه معتبر نیست یا مدلی برای محاسبه احتمال موجود نمیباشد." />
+          <NotCalculated reason="کیفیت جلسه معتبر نیست؛ احتمال و ویژگیهای مدل محاسبه نمیشود." />
         )}
       </Card>
 
@@ -219,25 +231,49 @@ export function SessionDetail() {
         {report?.sections?.length ? (
           <div className="space-y-5">
             {report.sections.map((section, i) => {
-              // Accept both {items,note} and {content,status} section shapes.
-              const rows = section.items?.length
-                ? section.items
-                : Array.isArray(section.content)
-                  ? section.content
-                  : [];
+              // Accept {items,note}, string content, and the backend's raw
+              // {content,status} object shape (with its pending message).
+              const content = section.content as unknown;
+              const obj = content != null && typeof content === 'object' && !Array.isArray(content)
+                ? (content as Record<string, unknown>)
+                : null;
+              const message = obj && typeof obj.message === 'string'
+                ? obj.message
+                : obj && typeof obj.text === 'string'
+                  ? obj.text
+                  : undefined;
+              const pending = section.status === 'PENDING';
+              // Pending sections show the explanatory message as prose; hide
+              // internal bookkeeping fields such as status/features.
+              const rows = pending
+                ? []
+                : section.items?.length
+                  ? section.items
+                  : Array.isArray(content)
+                    ? (content as Array<{ label: string; value?: string | number | null }>)
+                    : obj
+                      ? Object.entries(obj)
+                          .filter(([key, value]) =>
+                            key !== 'features' && key !== 'xai' && key !== 'contributions' &&
+                            value !== null && typeof value !== 'object'
+                          )
+                          .map(([key, value]) => ({ label: key, value: String(value) }))
+                      : [];
               const prose = rows.length
                 ? undefined
-                : typeof section.content === 'string'
-                  ? section.content
-                  : section.note;
-              const notCalculated = section.status === 'NOT_CALCULATED' || section.status === 'NO_DATA';
+                : typeof content === 'string'
+                  ? content
+                  : message ?? section.note;
+              const notCalculated = section.status === 'NOT_CALCULATED';
               return (
                 <div key={section.key ?? i} className="rounded-xl border border-border/70 bg-surface-2/30 p-4">
                   <h4 className="mb-3 flex items-center gap-2 text-xs font-extrabold text-primary">
                     <span className="nums flex h-6 w-6 items-center justify-center rounded-full bg-primary-soft text-[10px]">{i + 1}</span>
                     {section.title}
-                    {notCalculated ? (
-                      <Badge tone="warning" className="mr-auto">Not Calculated</Badge>
+                    {pending ? (
+                      <span className="mr-auto"><ModelPendingBadge /></span>
+                    ) : notCalculated ? (
+                      <Badge tone="warning" className="mr-auto">محاسبه نشد</Badge>
                     ) : null}
                   </h4>
                   {rows.length ? (

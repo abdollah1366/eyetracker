@@ -47,13 +47,13 @@ export function QualityBadge({
   );
 }
 
-/** Honest placeholder wherever a probability cannot be computed. */
+/** Honest placeholder only when data quality is genuinely invalid. */
 export function NotCalculated({ reason }: { reason?: string }) {
   return (
     <div className="flex items-start gap-3 rounded-xl border border-warning/25 bg-warning-soft/60 p-4">
       <AlertTriangle size={20} className="mt-0.5 shrink-0 text-warning" />
       <div>
-        <p className="text-sm font-bold text-ink">Not Calculated – Insufficient Data Quality</p>
+        <p className="text-sm font-bold text-ink">محاسبه نشد – کیفیت داده کافی نیست</p>
         <p className="mt-1 text-xs leading-6 text-ink-muted">
           {reason ??
             'احتمال و نتیجه مدل تنها زمانی نمایش داده میشود که کیفیت داده معتبر و مدل موجود باشد.'}

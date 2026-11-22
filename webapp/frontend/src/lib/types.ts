@@ -228,6 +228,8 @@ export interface Session {
   features?: Features | null;
   risk?: Risk | null;
   xai?: XAIEntry[] | null;
+  message?: string | null;
+  heatmap_available?: boolean;
 }
 
 export interface CompleteRequest {
@@ -241,11 +243,36 @@ export interface CompleteResponse {
   quality: QualityReport | null;
   features: Features | null;
   risk: Risk | null;
+  message?: string | null;
 }
 
 export interface HeatmapSeries {
   stimulus: string;
   points: Array<[number, number]>;
+}
+
+/** Cohort progress toward the 100-participant model gate. */
+export interface ModelReadiness {
+  required_participants: number;
+  labeled_participants: number;
+  labeled_sessions: number;
+  progress: number;
+  participants_ready: boolean;
+  model_available: boolean;
+  ready: boolean;
+  message: string | null;
+}
+
+/** Mean gaze density over all sessions and all stimuli (normalized 0..1). */
+export interface GlobalHeatmap {
+  grid: number[][];
+  grid_width: number;
+  grid_height: number;
+  point_count: number;
+  session_count: number;
+  stimulus_count: number;
+  stimuli: string[];
+  stimulus: string | null;
 }
 
 export interface SessionEvent {
@@ -364,14 +391,16 @@ export interface PredictRequest {
 }
 
 export interface PredictResponse {
-  risk: Risk;
+  risk: Risk | null;
   version: string;
   xai: XAIEntry[];
   disclaimer: string;
+  message?: string | null;
+  probability?: number | null;
 }
 
 /* ---------------- Reports (10 sections, chapter 3) ---------------- */
-export type ReportSectionStatus = 'OK' | 'NOT_CALCULATED' | 'NO_DATA';
+export type ReportSectionStatus = 'OK' | 'PENDING' | 'NOT_CALCULATED' | 'NO_DATA';
 
 export interface ReportSectionItem {
   label: string;
@@ -388,7 +417,7 @@ export interface ReportSection {
   title: string;
   status?: ReportSectionStatus;
   items?: ReportSectionItem[];
-  content?: string | ReportSectionItem[];
+  content?: string | ReportSectionItem[] | Record<string, unknown>;
   note?: string;
 }
 

@@ -71,7 +71,9 @@ webapp/
   - اگر INVALID: `features` و `risk` **must be null** و پیام `Eye Tracking Result: Not Calculated – Insufficient Data Quality`.
 - `GET /sessions/{id}` → جزئیات + quality + features + risk + xai
 - `GET /sessions/{id}/heatmap` → `[{stimulus,points:[[x,y],...]}]` (برای Canvas)
+- `GET /heatmap/global?stimulus=` → میانگین نگاه تمام جلسات/تصاویر روی شبکه ۴۸×۲۷ نرمالشده (`grid`, `grid_width`, `grid_height`, `point_count`, `session_count`, `stimulus_count`, `stimuli`). هر جلسه بر اساس اندازه صفحه خود نرمالسازی میشود.
 - `GET /sessions/{id}/events` → event log (شروع/پایان هر محرک، خطاها)
+- `GET /models/readiness` → پیشرفت تکمیل کوهورت مدل (`labeled_participants`, `required_participants=100`, `progress`, `ready`). تا `ready=true` احتمالی محاسبه نمیشود.
 
 ### Assessments (Conners / IVA-2)
 - `GET/POST /participants/{id}/assessments` `{kind:'CONNERS'|'IVA2',version,scores:object,assessed_at,notes}`
@@ -137,7 +139,7 @@ Dark sidebar `#0F4757` · فاصلهها ضریب ۸ · شعاع 12–16px · ف
 
 ## 7. قوانین سختگیرانه
 1. هیچ gaze/j_prediction جعلی و هیچ عدد نمایشی ساختگی وجود ندارد.
-2. probability تنها زمانی نمایش داده میشود که مدل وجود داشته باشد و کیفیت VALID باشد؛ در غیر اینصورت `Not Calculated`.
+2. probability تنها زمانی نمایش داده میشود که حداقل ۱۰۰ مراجع برچسبخورده تکمیل شده، مدل آموزش دیده و کیفیت VALID باشد. تا آن زمان فقط مقادیر خام (کیفیت/ویژگیها) نمایش داده میشود و وضعیت `PENDING` است — این حالت خطا یا «نتیجه نامعتبر» محسوب نمیشود. `Not Calculated` تنها برای کیفیت نامعتبر است.
 3. فریم خام دوربین به سرور ارسال نمیشود؛ فقط ویژگیها/نقاط نگاشتشده.
 4. داده هویتی (نام/تلفن) در جدول جداگانهی participant نگهداری وارد CSV پژوهشی نمیشود.
 5. هر Prediction همراه model_version، feature_version و timestamp ذخیره میشود.

@@ -29,6 +29,7 @@ from app.models import (
 from app.routers import scoped_clinic_id
 from app.schemas import (
     CompleteRequest,
+    GlobalHeatmap,
     HeatmapPoint,
     RiskInfo,
     SampleBatchIn,
@@ -44,6 +45,7 @@ from app.schemas import (
 )
 from app.security import get_current_user, require_clinician
 from app.services.features import EXTRACTOR_VERSION, extract_features
+from app.services.heatmap import build_global_map
 from app.services.ml import DISCLAIMER, NOT_CALCULATED_MESSAGE
 from app.services.quality import Thresholds, evaluate_quality
 
@@ -484,6 +486,35 @@ def session_heatmap(
         HeatmapPoint(stimulus=stimulus, points=points)
         for stimulus, points in sorted(grouped.items())
     ]
+
+
+@router.get("/heatmap/global", response_model=GlobalHeatmap)
+def global_heatmap(
+    stimulus: str | None = Query(default=None, max_length=120),
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+) -> GlobalHeatmap:
+    """Mean gaze density across all sessions/stimuli (clinic-scoped).
+
+    Every point is normalized by its own session's screen size before binning.
+    Invalid gaze rows and tracking loss are excluded; off-screen valid gaze is
+    kept as a distinct observation, consistent with the per-session heatmap.
+    """
+    query = (
+        db.query(GazeSample, EyeTrackingSession)
+        .join(EyeTrackingSession, GazeSample.session_id == EyeTrackingSession.id)
+        .filter(GazeSample.gaze_valid.is_(True))
+        .filter(GazeSample.gaze_x.isnot(None), GazeSample.gaze_y.isnot(None))
+    )
+    clinic_id = scoped_clinic_id(current, None)
+    if clinic_id is not None:
+        query = query.join(Participant, EyeTrackingSession.participant_id == Participant.id).filter(
+            Participant.clinic_id == clinic_id
+        )
+    if stimulus:
+        query = query.filter(GazeSample.stimulus == stimulus)
+    rows = query.all()
+    return GlobalHeatmap.model_validate(build_global_map(rows, stimulus))
 
 
 @router.get("/sessions/{session_id}/events", response_model=SessionEventsOut)

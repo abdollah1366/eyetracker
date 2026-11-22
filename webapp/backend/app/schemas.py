@@ -385,6 +385,19 @@ class HeatmapPoint(BaseModel):
     points: list[list[float]]
 
 
+class GlobalHeatmap(BaseModel):
+    """Normalized mean gaze density over every session and every stimulus."""
+
+    grid: list[list[float]]
+    grid_width: int
+    grid_height: int
+    point_count: int
+    session_count: int
+    stimulus_count: int
+    stimuli: list[str]
+    stimulus: str | None = None
+
+
 class SessionEventsOut(BaseModel):
     items: list[dict[str, Any]]
     total: int = 0
@@ -507,7 +520,7 @@ class CptSubmission(BaseModel):
 # Models / predictions
 # ---------------------------------------------------------------------------
 class TrainRequest(BaseModel):
-    min_labeled_sessions: int = Field(default=30, ge=2, le=100_000)
+    min_labeled_sessions: int = Field(default=100, ge=2, le=100_000)
 
 
 class TrainMetrics(BaseModel):
@@ -554,6 +567,19 @@ class ModelCard(BaseModel):
     disclaimer: str
 
 
+class ModelReadiness(BaseModel):
+    """Cohort progress shown instead of a risk score while the model is forming."""
+
+    required_participants: int
+    labeled_participants: int
+    labeled_sessions: int
+    progress: float
+    participants_ready: bool
+    model_available: bool
+    ready: bool
+    message: str | None = None
+
+
 class PredictRequest(BaseModel):
     session_id: int
 
@@ -578,7 +604,7 @@ class ReportSection(BaseModel):
     key: str
     title: str
     content: Any = None
-    status: Literal["OK", "NOT_CALCULATED", "NO_DATA"] = "NO_DATA"
+    status: Literal["OK", "PENDING", "NOT_CALCULATED", "NO_DATA"] = "NO_DATA"
 
 
 class ReportOut(BaseModel):

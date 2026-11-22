@@ -11,6 +11,7 @@ from app.models import ModelVersion, User
 from app.schemas import (
     ModelCard,
     ModelList,
+    ModelReadiness,
     ModelSummary,
     PredictRequest,
     PredictResponse,
@@ -48,6 +49,15 @@ def list_models(
         skip=safe_skip,
         limit=safe_limit,
     )
+
+
+@router.get("/models/readiness", response_model=ModelReadiness)
+def model_readiness(
+    db: Session = Depends(get_db),
+    current: User = Depends(get_current_user),
+) -> ModelReadiness:
+    """Cohort progress toward the 100-participant model gate."""
+    return ModelReadiness.model_validate(ml.model_readiness(db))
 
 
 @router.post("/models/train", response_model=TrainMetrics)

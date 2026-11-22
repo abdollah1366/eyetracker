@@ -17,10 +17,12 @@ import type {
   CompleteRequest,
   CompleteResponse,
   DetailError,
+  GlobalHeatmap,
   HeatmapSeries,
   LoginRequest,
   LoginResponse,
   ModelMetrics,
+  ModelReadiness,
   ModelVersion,
   Paginated,
   Participant,
@@ -199,6 +201,13 @@ export const sessionsApi = {
     unwrap<CompleteResponse>({ method: 'POST', url: `/sessions/${id}/complete`, data: body }),
   heatmap: (id: number | string) =>
     unwrap<HeatmapSeries[]>({ method: 'GET', url: `/sessions/${id}/heatmap` }),
+  /** Mean density over all valid gaze points, across every session and stimulus. */
+  globalHeatmap: (stimulus?: string) =>
+    unwrap<GlobalHeatmap>({
+      method: 'GET',
+      url: '/heatmap/global',
+      params: stimulus ? { stimulus } : undefined,
+    }),
   events: (id: number | string) =>
     unwrap<SessionEvent[]>({ method: 'GET', url: `/sessions/${id}/events` }),
 };
@@ -239,6 +248,7 @@ export const cptApi = {
 
 export const modelsApi = {
   list: () => unwrap<ModelVersion[]>({ method: 'GET', url: '/models' }),
+  readiness: () => unwrap<ModelReadiness>({ method: 'GET', url: '/models/readiness' }),
   train: (body: TrainRequest) =>
     unwrap<ModelMetrics>({ method: 'POST', url: '/models/train', data: body }),
   get: (version: string) =>

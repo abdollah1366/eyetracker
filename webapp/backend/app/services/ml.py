@@ -37,8 +37,13 @@ from app.models import EyeTrackingSession, ModelVersion, Prediction
 from app.services.features import FEATURE_VERSION, flatten_features
 
 DISCLAIMER = "ابزار پشتیبان تصمیم پژوهشی است، جایگزین تشخیص متخصص نیست."
-NOT_TRAINED_MESSAGE = "Model not trained"
+NOT_TRAINED_MESSAGE = "مدل آموزشدیدهای موجود نیست."
 NOT_CALCULATED_MESSAGE = "Eye Tracking Result: Not Calculated – Insufficient Data Quality"
+MODEL_READY_PARTICIPANTS = 100
+MODEL_PENDING_MESSAGE = (
+    "مدل در حال تکمیل است؛ تا رسیدن به ۱۰۰ مراجع دارای برچسب، احتمال پیشبینی محاسبه نمیشود "
+    "و فقط مقادیر خام ارزیابی (کیفیت و ویژگیها) نمایش داده میشود."
+)
 
 LABEL_TO_INT = {"ADHD": 1, "CONTROL": 0}
 BOOTSTRAP_ROUNDS = 1000
@@ -82,6 +87,29 @@ def _session_rows(db: Session) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def model_readiness(db: Session) -> dict[str, Any]:
+    """Progress toward the research cohort size required before showing risk.
+
+    Until ``MODEL_READY_PARTICIPANTS`` distinct labelled participants have a
+    valid session with features, the API must expose raw values only and never
+    a model probability. A trained version alone is not enough.
+    """
+    rows = _session_rows(db)
+    labelled_participants = len({int(row["participant_id"]) for row in rows})
+    participants_ready = labelled_participants >= MODEL_READY_PARTICIPANTS
+    model_available = latest_model_version(db) is not None
+    return {
+        "required_participants": MODEL_READY_PARTICIPANTS,
+        "labeled_participants": labelled_participants,
+        "labeled_sessions": len(rows),
+        "progress": round(min(1.0, labelled_participants / MODEL_READY_PARTICIPANTS), 4),
+        "participants_ready": participants_ready,
+        "model_available": model_available,
+        "ready": participants_ready and model_available,
+        "message": None if participants_ready and model_available else MODEL_PENDING_MESSAGE,
+    }
 
 
 def _participant_labels(rows: list[dict[str, Any]]) -> dict[int, int]:
@@ -292,6 +320,12 @@ def predict_session(
 
     if session.quality is None or session.quality.status != "VALID" or session.features is None:
         return _unavailable(version, NOT_CALCULATED_MESSAGE)
+
+    # Research gate: no risk probability before the full labelled cohort and a
+    # trained model exist. Raw quality/feature values remain available.
+    readiness = model_readiness(db)
+    if not readiness["ready"]:
+        return _unavailable(version, MODEL_PENDING_MESSAGE)
 
     record = get_model_version(db, version) if version else latest_model_version(db)
     if record is None:
