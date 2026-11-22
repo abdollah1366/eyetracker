@@ -262,8 +262,14 @@ export function polynomialDesign(features: number[][]): number[][] {
 
 /** Solve (XᵀX)·coef = XᵀY for a single output via Gaussian elimination. */
 function solveNormalEquations(A: number[][], b: number[]): number[] {
-  const n = b.length;
-  const M = A.map((row, i) => [...row, b[i]]);
+  const n = Math.min(A.length, b.length);
+  if (n === 0) return [];
+  // Defensive guard: never index past a row. Singularity is handled below by
+  // skipping the pivot (coefficient stays 0) instead of throwing.
+  const M = Array.from({ length: n }, (_, i) => {
+    const row = A[i] ?? [];
+    return Array.from({ length: n + 1 }, (_, j) => (j === n ? (b[i] ?? 0) : (row[j] ?? 0)));
+  });
   for (let col = 0; col < n; col++) {
     let pivot = col;
     for (let r = col + 1; r < n; r++) {
@@ -294,14 +300,16 @@ export function fitGazeMapping(features: number[][], screenXY: number[][]): {
   const XtX = Array.from({ length: k }, (_, i) =>
     Array.from({ length: k }, (_, j) => X.reduce((s, row) => s + row[i] * row[j], 0)),
   );
-  const coefX = solveNormalEquations(
-    XtX,
-    X.map((row, i) => row.reduce((s, v) => s + v * (screenXY[i]?.[0] ?? 0), 0)),
-  );
-  const coefY = solveNormalEquations(
-    XtX,
-    X.map((row, i) => row.reduce((s, v) => s + v * (screenXY[i]?.[1] ?? 0), 0)),
-  );
+  // Xᵀ·y has one entry PER COEFFICIENT (k), not per observation. The previous
+  // implementation produced a length-N vector (N = number of points), which
+  // made the square solver read past the matrix and throw on 5-point
+  // calibration. Compute each column j as Σ_i X[i][j]·y[i].
+  const rhs = (y: number[]): number[] =>
+    Array.from({ length: k }, (_, j) =>
+      X.reduce((s, row, i) => s + row[j] * (y[i] ?? 0), 0),
+    );
+  const coefX = solveNormalEquations(XtX, rhs(screenXY.map((p) => p?.[0] ?? 0)));
+  const coefY = solveNormalEquations(XtX, rhs(screenXY.map((p) => p?.[1] ?? 0)));
 
   const errors = X.map((row, i) => {
     const predX = row.reduce((s, v, c) => s + v * coefX[c], 0);
