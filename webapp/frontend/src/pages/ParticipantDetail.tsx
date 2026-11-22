@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowRight, CalendarDays, ClipboardList, FileText, User } from 'lucide-react';
-import { assessmentsApi, asItems, participantsApi } from '../lib/api';
-import { codeLabel, formatDate, formatDateTime, sexLabel } from '../lib/format';
+import { ArrowRight, CalendarDays, ClipboardList, FileText, Sparkles, User } from 'lucide-react';
+import { asItems, participantsApi } from '../lib/api';
+import { assessmentScores, codeLabel, formatDate, formatDateTime, formatDecimal, sexLabel } from '../lib/format';
 import type { Assessment, Participant, Session } from '../lib/types';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Spinner } from '../components/ui/Spinner';
+import { useToast } from '../components/ui/Toast';
 import { QualityBadge } from '../components/QualityBadge';
+import { ParentRatingScale } from '../components/assessments/ParentRatingScale';
 
 export function ParticipantDetail() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +20,8 @@ export function ParticipantDetail() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scaleOpen, setScaleOpen] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     if (!id) return;
@@ -38,6 +43,11 @@ export function ParticipantDetail() {
     };
   }, [id]);
 
+  const reloadAssessments = () => {
+    if (!id) return;
+    participantsApi.assessments(id).then((res) => setAssessments(asItems(res))).catch(() => undefined);
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -57,12 +67,17 @@ export function ParticipantDetail() {
         title={`شناسه پژوهشی ${participant.research_id}`}
         subtitle="مشخصات، ارزیابیها و زمانبندی جلسات ثبتشده"
         actions={
-          <Link
-            to={`/assessments?participant=${participant.id}`}
-            className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-semibold text-ink transition-colors hover:bg-surface-2"
-          >
-            <ClipboardList size={18} className="flip-rtl" /> ثبت ارزیابی
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button leftIcon={<Sparkles size={17} />} onClick={() => setScaleOpen(true)}>
+              تست والدین (SNAP-IV)
+            </Button>
+            <Link
+              to={`/assessments?participant=${participant.id}`}
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-semibold text-ink transition-colors hover:bg-surface-2"
+            >
+              <ClipboardList size={18} className="flip-rtl" /> ثبت ارزیابی
+            </Link>
+          </div>
         }
       />
 
@@ -100,27 +115,61 @@ export function ParticipantDetail() {
         <Card className="lg:col-span-2">
           <CardHeader
             title="ارزیابیها"
-            subtitle="نتایج ثبتشده کانرز و IVA-2"
+            subtitle="نتایج ثبتشده پرسشنامه والدین، کانرز و IVA-2"
             action={<ClipboardList size={18} className="text-ink-subtle" />}
           />
           {assessments.length === 0 ? (
             <EmptyState compact icon={<FileText size={22} />} title="دادهای ثبت نشده است" description="هیچ ارزیابیی برای این شرکتکننده ثبت نشده است." />
           ) : (
             <div className="space-y-3">
-              {assessments.map((a) => (
-                <div key={a.id} className="flex items-center justify-between rounded-xl border border-border/70 bg-surface-2/40 px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft text-primary">
-                      <FileText size={18} />
+              {assessments.map((a) => {
+                const scores = assessmentScores(a);
+                const subscales = scores.subscales as
+                  | Record<string, { mean: number; severity_fa: string; severity_code: string }>
+                  | undefined;
+                const isParentRating = a.kind === 'PARENT_RATING' && Boolean(subscales);
+                return (
+                  <div key={a.id} className="rounded-xl border border-border/70 bg-surface-2/40 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                          <FileText size={18} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-ink">{codeLabel(a.kind)} — {a.version}</p>
+                          <p className="text-[11px] text-ink-muted">{formatDate(a.assessed_at)}</p>
+                        </div>
+                      </div>
+                      {!isParentRating ? (
+                        <Badge tone="info">{Object.keys(scores).length} شاخص</Badge>
+                      ) : null}
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-ink">{codeLabel(a.kind)} — {a.version}</p>
-                      <p className="text-[11px] text-ink-muted">{formatDate(a.assessed_at)}</p>
-                    </div>
+                    {isParentRating && subscales ? (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {[
+                          ['inattention', 'عدم توجه'],
+                          ['hyperactivity', 'بیشفعالی'],
+                          ['odd', 'نافرمانی'],
+                          ['adhd_total', 'مجموع ADHD'],
+                        ].map(([key, label]) => {
+                          const row = subscales[key];
+                          if (!row) return null;
+                          const tone = row.severity_code === 'elevated' ? 'error' : row.severity_code === 'borderline' ? 'warning' : 'success';
+                          return (
+                            <div key={key} className="rounded-lg border border-border/60 bg-surface px-3 py-2">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[10px] font-semibold text-ink-muted">{label}</span>
+                                <Badge tone={tone}>{row.severity_fa}</Badge>
+                              </div>
+                              <p className="nums mt-1 text-lg font-bold text-ink" dir="ltr">{formatDecimal(row.mean, 2)}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </div>
-                  <Badge tone="info">{Object.keys(a.scores ?? {}).length} شاخص</Badge>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
@@ -157,6 +206,17 @@ export function ParticipantDetail() {
           </ol>
         )}
       </Card>
+
+      <ParentRatingScale
+        open={scaleOpen}
+        participantId={participant.id}
+        participantLabel={participant.research_id}
+        onClose={() => setScaleOpen(false)}
+        onSaved={() => {
+          reloadAssessments();
+          toast.success('نتیجه پرسشنامه والدین در پرونده مراجع ذخیره شد.');
+        }}
+      />
     </div>
   );
 }

@@ -421,6 +421,39 @@ class AssessmentList(BaseModel):
     limit: int = 100
 
 
+class ParentRatingAnswerIn(BaseModel):
+    item_id: int = Field(ge=1, le=26)
+    value: int = Field(ge=0, le=3)
+
+
+class ParentRatingCreate(BaseModel):
+    """Raw 0..3 answers; the server computes every subscale before saving."""
+
+    instrument: Literal["SNAP-IV-26"] = "SNAP-IV-26"
+    answers: list[ParentRatingAnswerIn]
+    notes: str | None = None
+    assessed_at: datetime | None = None
+
+    @field_validator("answers")
+    @classmethod
+    def _all_items_exactly_once(cls, value: list[ParentRatingAnswerIn]) -> list[ParentRatingAnswerIn]:
+        ids = [answer.item_id for answer in value]
+        if len(ids) != len(set(ids)):
+            raise ValueError("هر سؤال باید دقیقاً یک بار پاسخ داده شود.")
+        if set(ids) != set(range(1, 27)):
+            raise ValueError("پاسخ تمام ۲۶ سؤال الزامی است.")
+        return value
+
+
+class ParentRatingDefinition(BaseModel):
+    instrument: str
+    title_fa: str
+    disclaimer_fa: str
+    likert: list[dict[str, Any]]
+    sections: list[dict[str, Any]]
+    items: list[dict[str, Any]]
+
+
 # ---------------------------------------------------------------------------
 # Models / predictions
 # ---------------------------------------------------------------------------

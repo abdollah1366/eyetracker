@@ -6,6 +6,7 @@ database is an isolated in-memory SQLite database.
 
 from __future__ import annotations
 
+import json
 import os
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
@@ -294,3 +295,63 @@ def test_sync_batch_is_idempotent(client: TestClient) -> None:
     status = client.get("/api/v1/sync/status", headers=headers)
     assert status.status_code == 200
     assert status.json()["total_events"] == 1
+
+
+def test_parent_rating_definition(client: TestClient) -> None:
+    response = client.get("/api/v1/rating-scales/parent", headers=_headers(client))
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["instrument"] == "SNAP-IV-26"
+    assert len(body["items"]) == 26
+    assert len(body["likert"]) == 4
+    assert [section["key"] for section in body["sections"]] == [
+        "inattention", "hyperactivity", "odd"
+    ]
+
+
+def test_parent_rating_autosaves_to_participant(client: TestClient) -> None:
+    headers = _headers(client)
+    participant_id = _participant(client, "P-SMOKE-PARENT-RATING")
+    # 26 answers: zeros for inattention, ones for hyperactivity, twos for ODD.
+    answers = [
+        {"item_id": item_id, "value": 0 if item_id <= 9 else (1 if item_id <= 18 else 2)}
+        for item_id in range(1, 27)
+    ]
+    created = client.post(
+        f"/api/v1/participants/{participant_id}/parent-rating",
+        headers=headers,
+        json={"answers": answers, "notes": "پاسخ والد"},
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["participant_id"] == participant_id
+    assert body["kind"] == "PARENT_RATING"
+    assert body["version"] == "SNAP-IV-26"
+
+    scores = json.loads(body["scores_json"])
+    subscales = scores["subscales"]
+    assert scores["answered"] == 26
+    assert subscales["inattention"]["mean"] == 0.0
+    assert subscales["inattention"]["severity_code"] == "normal"
+    assert subscales["hyperactivity"]["mean"] == 1.0
+    assert subscales["hyperactivity"]["severity_code"] == "borderline"
+    assert subscales["odd"]["mean"] == 2.0
+    assert subscales["odd"]["severity_code"] == "elevated"
+    assert subscales["adhd_total"]["mean"] == 0.5
+
+    listed = client.get(
+        f"/api/v1/participants/{participant_id}/assessments", headers=headers
+    )
+    assert listed.status_code == 200, listed.text
+    assert [item["id"] for item in listed.json()["items"]] == [body["id"]]
+
+
+def test_parent_rating_rejects_incomplete_answers(client: TestClient) -> None:
+    headers = _headers(client)
+    participant_id = _participant(client, "P-SMOKE-PARENT-RATING-BAD")
+    response = client.post(
+        f"/api/v1/participants/{participant_id}/parent-rating",
+        headers=headers,
+        json={"answers": [{"item_id": 1, "value": 0}]},
+    )
+    assert response.status_code == 422, response.text

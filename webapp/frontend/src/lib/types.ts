@@ -7,7 +7,7 @@ export type Role = 'admin' | 'clinician' | 'researcher';
 export type SessionStatus = 'COLLECTING' | 'VALID' | 'INVALID' | 'COMPLETED';
 export type SessionLabel = 'ADHD' | 'CONTROL' | 'UNKNOWN';
 export type QualityStatus = 'VALID' | 'INVALID';
-export type AssessmentKind = 'CONNERS' | 'IVA2';
+export type AssessmentKind = 'CONNERS' | 'IVA2' | 'PARENT_RATING';
 
 export interface DetailError {
   detail: string | Array<{ loc?: string[]; msg: string; type?: string }>;
@@ -261,10 +261,14 @@ export interface Assessment {
   id: number | string;
   participant_id: number | string;
   kind: AssessmentKind;
-  version: string;
-  scores: Record<string, unknown>;
-  assessed_at: string;
+  version: string | null;
+  /** Backend stores scores as a JSON string in `scores_json`. */
+  scores_json: string;
+  /** Only present on objects constructed locally; prefer `assessmentScores()`. */
+  scores?: Record<string, unknown>;
+  assessed_at: string | null;
   notes?: string | null;
+  created_at?: string;
 }
 
 export interface AssessmentCreate {
@@ -273,6 +277,28 @@ export interface AssessmentCreate {
   scores: Record<string, unknown>;
   assessed_at: string;
   notes?: string;
+}
+
+/* ---------------- Parent rating scale (SNAP-IV) ---------------- */
+export interface ParentRatingDefinition {
+  instrument: string;
+  title_fa: string;
+  disclaimer_fa: string;
+  likert: Array<{ value: number; label_fa: string }>;
+  sections: Array<{
+    key: string;
+    title_fa: string;
+    description_fa: string;
+    item_ids: number[];
+  }>;
+  items: Array<{ id: number; section: string; text_fa: string }>;
+}
+
+export interface ParentRatingCreate {
+  instrument: 'SNAP-IV-26';
+  answers: Array<{ item_id: number; value: number }>;
+  notes?: string;
+  assessed_at?: string;
 }
 
 /* ---------------- Models ---------------- */

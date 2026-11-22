@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ClipboardList, Plus, Trash2 } from 'lucide-react';
 import { apiErrorMessage, asItems, assessmentsApi, participantsApi } from '../lib/api';
-import { codeLabel, formatDate } from '../lib/format';
+import { assessmentScores, codeLabel, formatDate } from '../lib/format';
 import type { Assessment, AssessmentKind, Participant } from '../lib/types';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader } from '../components/ui/Card';
@@ -122,7 +122,7 @@ export function Assessments() {
     {
       key: 'scores',
       header: 'تعداد شاخصها',
-      render: (row) => <span className="nums">{Object.keys(row.scores ?? {}).length}</span>,
+      render: (row) => <span className="nums">{Object.keys(assessmentScores(row)).length}</span>,
     },
     { key: 'assessed_at', header: 'تاریخ ارزیابی', render: (row) => formatDate(row.assessed_at) },
     {

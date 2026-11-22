@@ -25,6 +25,8 @@ import type {
   ParticipantCreate,
   ParticipantListParams,
   ParticipantPatch,
+  ParentRatingCreate,
+  ParentRatingDefinition,
   PredictRequest,
   PredictResponse,
   QualityConfig,
@@ -208,6 +210,18 @@ export const assessmentsApi = {
     }),
   remove: (id: number | string) =>
     unwrap<{ detail: string }>({ method: 'DELETE', url: `/assessments/${id}` }),
+};
+
+/** SNAP-IV item bank and server-scored submission, stored on the participant. */
+export const ratingScalesApi = {
+  parentDefinition: () =>
+    unwrap<ParentRatingDefinition>({ method: 'GET', url: '/rating-scales/parent' }),
+  submitParent: (participantId: number | string, body: ParentRatingCreate) =>
+    unwrap<Assessment>({
+      method: 'POST',
+      url: `/participants/${participantId}/parent-rating`,
+      data: body,
+    }),
 };
 
 export const modelsApi = {

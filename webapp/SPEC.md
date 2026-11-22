@@ -76,6 +76,9 @@ webapp/
 ### Assessments (Conners / IVA-2)
 - `GET/POST /participants/{id}/assessments` `{kind:'CONNERS'|'IVA2',version,scores:object,assessed_at,notes}`
 - `DELETE /assessments/{id}`
+- `GET /rating-scales/parent` → بانک سؤالات SNAP-IV (۲۶ آیتم، ۴ گزینه لیکرت، ۳ خردهمقیاس). متن سؤالات سمت سرور است تا کلاینت نتواند از نمرهگذاری منحرف شود.
+- `POST /participants/{id}/parent-rating` `{instrument:'SNAP-IV-26', answers:[{item_id:1..26, value:0..3}], notes?, assessed_at?}` → ارزیابی با `kind=PARENT_RATING` و `version=SNAP-IV-26` بهطور خودکار در پرونده همان مراجع ذخیره میشود. میانگینهای `inattention`، `hyperactivity`، `odd` و `adhd_total` + شدت آنها **سرور محاسبه میکند** (کلاینت فقط پاسخ خام میفرستد). اعتبار پاسخها: ۲۶ آیتم دقیقاً یکبار، مقادیر ۰ تا ۳.
+  - یادداشت: SNAP-IV یک ابزار غربالگری آزاد است؛ مقیاسهای تجاری کانرز (MHS) کپی نشدهاند و در صورت داشتن مجوز میشوند جایگزین شوند.
 
 ### Models
 - `GET /models` → لیست نسخهها + متریکها

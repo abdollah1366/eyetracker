@@ -1,5 +1,7 @@
 /** Persian (fa-IR) number, date and text formatting helpers. */
 
+import type { Assessment } from './types';
+
 const faDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
 
 /** Convert any ASCII digits in a string to Persian digits. */
@@ -121,9 +123,25 @@ export const labelFa: Record<string, string> = {
   COMPLETED: 'تکمیلشده',
   CONNERS: 'کانرز',
   IVA2: 'IVA-2',
+  PARENT_RATING: 'پرسشنامه والدین (SNAP-IV)',
 };
 
 export function codeLabel(code: string | null | undefined): string {
   if (!code) return '—';
   return labelFa[code] ?? code;
+}
+
+/** Parse the backend's JSON-string score payload from any assessment record. */
+export function assessmentScores(assessment: Assessment): Record<string, unknown> {
+  if (assessment.scores) return assessment.scores;
+  const raw = assessment.scores_json;
+  if (!raw || typeof raw !== 'string') return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
 }
