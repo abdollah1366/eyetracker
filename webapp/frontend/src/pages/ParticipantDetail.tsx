@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowRight, CalendarDays, ClipboardList, FileText, Sparkles, User } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, ClipboardList, FileText, Sparkles, User } from 'lucide-react';
 import { asItems, participantsApi } from '../lib/api';
 import { assessmentScores, codeLabel, formatDate, formatDateTime, formatDecimal, sexLabel } from '../lib/format';
 import type { Assessment, Participant, Session } from '../lib/types';
@@ -13,6 +13,7 @@ import { Spinner } from '../components/ui/Spinner';
 import { useToast } from '../components/ui/Toast';
 import { QualityBadge } from '../components/QualityBadge';
 import { ParentRatingScale } from '../components/assessments/ParentRatingScale';
+import { IvaCptTest } from '../components/assessments/IvaCptTest';
 
 export function ParticipantDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,7 @@ export function ParticipantDetail() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [scaleOpen, setScaleOpen] = useState(false);
+  const [cptOpen, setCptOpen] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -68,6 +70,9 @@ export function ParticipantDetail() {
         subtitle="مشخصات، ارزیابیها و زمانبندی جلسات ثبتشده"
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="accent" leftIcon={<Activity size={17} />} onClick={() => setCptOpen(true)}>
+              تست IVA-2
+            </Button>
             <Button leftIcon={<Sparkles size={17} />} onClick={() => setScaleOpen(true)}>
               تست والدین (SNAP-IV)
             </Button>
@@ -128,6 +133,10 @@ export function ParticipantDetail() {
                   | Record<string, { mean: number; severity_fa: string; severity_code: string }>
                   | undefined;
                 const isParentRating = a.kind === 'PARENT_RATING' && Boolean(subscales);
+                const perModality = scores.per_modality as
+                  | Record<string, Record<string, number>>
+                  | undefined;
+                const isIvaCpt = a.kind === 'IVA2' && Boolean(perModality);
                 return (
                   <div key={a.id} className="rounded-xl border border-border/70 bg-surface-2/40 px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
@@ -140,7 +149,7 @@ export function ParticipantDetail() {
                           <p className="text-[11px] text-ink-muted">{formatDate(a.assessed_at)}</p>
                         </div>
                       </div>
-                      {!isParentRating ? (
+                      {!isParentRating && !isIvaCpt ? (
                         <Badge tone="info">{Object.keys(scores).length} شاخص</Badge>
                       ) : null}
                     </div>
@@ -162,6 +171,27 @@ export function ParticipantDetail() {
                                 <Badge tone={tone}>{row.severity_fa}</Badge>
                               </div>
                               <p className="nums mt-1 text-lg font-bold text-ink" dir="ltr">{formatDecimal(row.mean, 2)}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                    {isIvaCpt && perModality ? (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        {(['visual', 'auditory'] as const).map((modality) => {
+                          const row = perModality[modality];
+                          if (!row) return null;
+                          return (
+                            <div key={modality} className="rounded-lg border border-border/60 bg-surface px-3 py-2">
+                              <p className="text-[10px] font-bold text-ink">
+                                {modality === 'visual' ? 'دیداری' : 'شنیداری'}
+                              </p>
+                              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-ink-muted">
+                                <span>اصابت <b className="nums text-ink" dir="ltr">{row.hits}</b></span>
+                                <span>خطا <b className="nums text-ink" dir="ltr">{row.false_alarms}</b></span>
+                                <span>d' <b className="nums text-ink" dir="ltr">{formatDecimal(row.d_prime ?? 0, 2)}</b></span>
+                                <span>RT <b className="nums text-ink" dir="ltr">{formatDecimal(row.mean_hit_rt_ms ?? 0, 0)}</b></span>
+                              </div>
                             </div>
                           );
                         })}
@@ -215,6 +245,17 @@ export function ParticipantDetail() {
         onSaved={() => {
           reloadAssessments();
           toast.success('نتیجه پرسشنامه والدین در پرونده مراجع ذخیره شد.');
+        }}
+      />
+
+      <IvaCptTest
+        open={cptOpen}
+        participantId={participant.id}
+        participantLabel={participant.research_id}
+        onClose={() => setCptOpen(false)}
+        onSaved={() => {
+          reloadAssessments();
+          toast.success('نتیجه تست IVA-2 در پرونده مراجع ذخیره شد.');
         }}
       />
     </div>

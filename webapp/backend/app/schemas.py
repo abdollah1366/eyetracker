@@ -455,6 +455,55 @@ class ParentRatingDefinition(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# IVA-style Continuous Performance Test (open paradigm)
+# ---------------------------------------------------------------------------
+class CptTrialDefinition(BaseModel):
+    index: int
+    modality: Literal["visual", "auditory"]
+    digit: Literal[1, 2]
+
+
+class CptProtocol(BaseModel):
+    protocol_version: str
+    stimulus_duration_ms: int
+    inter_trial_interval_ms: int
+    total_trials: int
+    target_digit: int
+    non_target_digit: int
+    trials: list[CptTrialDefinition]
+
+
+class CptTrialResultIn(BaseModel):
+    trial_index: int = Field(ge=0, le=39)
+    reaction_ms: float | None = Field(default=None, ge=0, le=10000)
+    response_count: int = Field(default=0, ge=0, le=50)
+
+
+class CptSubmission(BaseModel):
+    """Raw per-trial responses; every score is recomputed server-side."""
+
+    protocol_version: Literal["IVA-CPT-1"] = "IVA-CPT-1"
+    results: list[CptTrialResultIn]
+    notes: str | None = None
+    assessed_at: datetime | None = None
+
+    @field_validator("results")
+    @classmethod
+    def _all_trials_once(cls, value: list[CptTrialResultIn]) -> list[CptTrialResultIn]:
+        indices = [item.trial_index for item in value]
+        if len(indices) != len(set(indices)):
+            raise ValueError("هر کارآزمایی باید دقیقاً یکبار گزارده شود.")
+        if set(indices) != set(range(40)):
+            raise ValueError("نتایج تمام ۴۰ کارآزمایی الزامی است.")
+        for item in value:
+            if item.reaction_ms is not None and item.response_count < 1:
+                raise ValueError("زمان واکنش بدون پاسخ نامعتبر است.")
+            if item.reaction_ms is None and item.response_count > 0:
+                raise ValueError("پاسخ بدون زمان واکنش نامعتبر است.")
+        return value
+
+
+# ---------------------------------------------------------------------------
 # Models / predictions
 # ---------------------------------------------------------------------------
 class TrainRequest(BaseModel):

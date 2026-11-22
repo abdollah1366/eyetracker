@@ -79,6 +79,9 @@ webapp/
 - `GET /rating-scales/parent` → بانک سؤالات SNAP-IV (۲۶ آیتم، ۴ گزینه لیکرت، ۳ خردهمقیاس). متن سؤالات سمت سرور است تا کلاینت نتواند از نمرهگذاری منحرف شود.
 - `POST /participants/{id}/parent-rating` `{instrument:'SNAP-IV-26', answers:[{item_id:1..26, value:0..3}], notes?, assessed_at?}` → ارزیابی با `kind=PARENT_RATING` و `version=SNAP-IV-26` بهطور خودکار در پرونده همان مراجع ذخیره میشود. میانگینهای `inattention`، `hyperactivity`، `odd` و `adhd_total` + شدت آنها **سرور محاسبه میکند** (کلاینت فقط پاسخ خام میفرستد). اعتبار پاسخها: ۲۶ آیتم دقیقاً یکبار، مقادیر ۰ تا ۳.
   - یادداشت: SNAP-IV یک ابزار غربالگری آزاد است؛ مقیاسهای تجاری کانرز (MHS) کپی نشدهاند و در صورت داشتن مجوز میشوند جایگزین شوند.
+- `GET /cpt/protocol` → پروتکل ثابت و سرورمحور تست پیوسته (IVA-style): ۴۰ کارآزمایی در دو بلوک دیداری و شنیداری؛ **رقم ۱ هدف و رقم ۲ غیرهدف** در هر دو بخش (مدت محرک ۶۰۰ms / فاصله ۱۴۰۰ms).
+- `POST /participants/{id}/iva-cpt` `{protocol_version:'IVA-CPT-1', results:[{trial_index:0..39, reaction_ms:float|null, response_count:int}], notes?, assessed_at?}` → ارزیابی `kind=IVA2`، `version=IVA-CPT-1` بهطور خودکار در پرونده مراجع ذخیره میشود. کلاینت فقط پاسخ خام (زمان واکنش به میلیثانیه) میفرستد؛ **تمام شاخصها سرور محاسبه میکند**: hits, misses, false alarms, correct rejections, hit rate, FA rate, d′ (با تصحیح 0.5/N)، mean hit RT و RT SD — جداگانه برای دیداری، شنیداری و کلی.
+  - پیادهسازی آزاد و الهامگرفته از الگوی IVA است؛ محتوای اختصاصی IVA-2 (آیتمها و جداول هنجار) کپی نشده است.
 
 ### Models
 - `GET /models` → لیست نسخهها + متریکها

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ClipboardList, Loader2 } from 'lucide-react';
 import { apiErrorMessage, ratingScalesApi } from '../../lib/api';
 import { formatDecimal } from '../../lib/format';
@@ -42,6 +42,20 @@ export function ParentRatingScale({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Assessment | null>(null);
+
+  // Keep the question list visually anchored while answers are selected.
+  // Focusing an off-screen control otherwise scrolls the modal to the bottom.
+  const listRef = useRef<HTMLDivElement>(null);
+  const scrollPosRef = useRef(0);
+
+  const setAnswer = useCallback((itemId: number, value: number) => {
+    scrollPosRef.current = listRef.current?.scrollTop ?? 0;
+    setAnswers((prev) => ({ ...prev, [itemId]: value }));
+  }, []);
+
+  useLayoutEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = scrollPosRef.current;
+  }, [answers]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -179,7 +193,7 @@ export function ParentRatingScale({
             </div>
           </div>
 
-          <div className="max-h-[52vh] space-y-5 overflow-y-auto pl-1">
+          <div ref={listRef} className="max-h-[52vh] space-y-5 overflow-y-auto overscroll-contain pl-1">
             {definition.sections.map((section, sectionIndex) => (
               <div key={section.key}>
                 <div className="mb-2 flex items-center gap-2">
@@ -209,24 +223,22 @@ export function ParentRatingScale({
                         </p>
                         <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={`پاسخ سؤال ${itemId}`}>
                           {definition.likert.map((option) => (
-                            <label
+                            <button
                               key={option.value}
-                              className={`flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] transition-colors ${
+                              type="button"
+                              role="radio"
+                              aria-checked={chosen === option.value}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => setAnswer(itemId, option.value)}
+                              className={`flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                                 chosen === option.value
                                   ? 'border-primary bg-primary text-white'
                                   : 'border-border bg-surface text-ink-muted hover:border-primary/40 hover:text-ink'
                               }`}
                             >
-                              <input
-                                type="radio"
-                                name={`item-${itemId}`}
-                                className="sr-only"
-                                checked={chosen === option.value}
-                                onChange={() => setAnswers((prev) => ({ ...prev, [itemId]: option.value }))}
-                              />
                               <span className="nums font-bold" dir="ltr">{option.value}</span>
                               <span>{option.label_fa}</span>
-                            </label>
+                            </button>
                           ))}
                         </div>
                       </div>

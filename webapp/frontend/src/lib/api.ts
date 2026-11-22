@@ -12,6 +12,8 @@ import type {
   ChangePasswordRequest,
   Clinic,
   ClinicCreate,
+  CptProtocol,
+  CptSubmission,
   CompleteRequest,
   CompleteResponse,
   DetailError,
@@ -220,6 +222,17 @@ export const ratingScalesApi = {
     unwrap<Assessment>({
       method: 'POST',
       url: `/participants/${participantId}/parent-rating`,
+      data: body,
+    }),
+};
+
+/** Open IVA-style CPT: server-owned protocol + server-side scoring. */
+export const cptApi = {
+  protocol: () => unwrap<CptProtocol>({ method: 'GET', url: '/cpt/protocol' }),
+  submit: (participantId: number | string, body: CptSubmission) =>
+    unwrap<Assessment>({
+      method: 'POST',
+      url: `/participants/${participantId}/iva-cpt`,
       data: body,
     }),
 };

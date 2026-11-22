@@ -355,3 +355,79 @@ def test_parent_rating_rejects_incomplete_answers(client: TestClient) -> None:
         json={"answers": [{"item_id": 1, "value": 0}]},
     )
     assert response.status_code == 422, response.text
+
+
+def test_cpt_protocol_shape(client: TestClient) -> None:
+    response = client.get("/api/v1/cpt/protocol", headers=_headers(client))
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["protocol_version"] == "IVA-CPT-1"
+    assert body["target_digit"] == 1
+    assert body["non_target_digit"] == 2
+    assert body["total_trials"] == 40
+    assert len(body["trials"]) == 40
+    assert sum(1 for t in body["trials"] if t["modality"] == "visual") == 20
+    assert sum(1 for t in body["trials"] if t["modality"] == "auditory") == 20
+    # Each modality is balanced: 10 targets and 10 non-targets.
+    for modality in ("visual", "auditory"):
+        block = [t for t in body["trials"] if t["modality"] == modality]
+        assert sum(1 for t in block if t["digit"] == 1) == 10
+        assert sum(1 for t in block if t["digit"] == 2) == 10
+
+
+def test_iva_cpt_scores_and_autosaves(client: TestClient) -> None:
+    headers = _headers(client)
+    participant_id = _participant(client, "P-SMOKE-IVA-CPT")
+    protocol_body = client.get("/api/v1/cpt/protocol", headers=headers).json()
+    trials = protocol_body["trials"]
+
+    # Perfect visual block, no responses at all in the auditory block.
+    results = []
+    for trial in trials:
+        if trial["modality"] == "visual" and trial["digit"] == 1:
+            results.append({"trial_index": trial["index"], "reaction_ms": 500.0, "response_count": 1})
+        else:
+            results.append({"trial_index": trial["index"], "reaction_ms": None, "response_count": 0})
+
+    created = client.post(
+        f"/api/v1/participants/{participant_id}/iva-cpt",
+        headers=headers,
+        json={"results": results},
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["kind"] == "IVA2"
+    assert body["version"] == "IVA-CPT-1"
+    assert body["participant_id"] == participant_id
+
+    scores = json.loads(body["scores_json"])
+    visual = scores["per_modality"]["visual"]
+    auditory = scores["per_modality"]["auditory"]
+    assert visual["hits"] == 10, visual
+    assert visual["misses"] == 0
+    assert visual["false_alarms"] == 0
+    assert visual["correct_rejections"] == 10
+    assert visual["hit_rate"] == 1.0
+    assert visual["false_alarm_rate"] == 0.0
+    assert visual["mean_hit_rt_ms"] == 500.0
+    assert auditory["hits"] == 0
+    assert auditory["misses"] == 10
+    assert auditory["false_alarms"] == 0
+    assert auditory["correct_rejections"] == 10
+    assert scores["overall"]["hits"] == 10
+
+    listed = client.get(
+        f"/api/v1/participants/{participant_id}/assessments", headers=headers
+    )
+    assert [item["id"] for item in listed.json()["items"]] == [body["id"]]
+
+
+def test_iva_cpt_rejects_partial_results(client: TestClient) -> None:
+    headers = _headers(client)
+    participant_id = _participant(client, "P-SMOKE-IVA-CPT-BAD")
+    response = client.post(
+        f"/api/v1/participants/{participant_id}/iva-cpt",
+        headers=headers,
+        json={"results": [{"trial_index": 0, "reaction_ms": 400, "response_count": 1}]},
+    )
+    assert response.status_code == 422, response.text

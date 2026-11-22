@@ -301,6 +301,36 @@ export interface ParentRatingCreate {
   assessed_at?: string;
 }
 
+/* ---------------- IVA-style CPT ---------------- */
+export interface CptTrial {
+  index: number;
+  modality: 'visual' | 'auditory';
+  digit: 1 | 2;
+}
+
+export interface CptProtocol {
+  protocol_version: string;
+  stimulus_duration_ms: number;
+  inter_trial_interval_ms: number;
+  total_trials: number;
+  target_digit: 1 | 2;
+  non_target_digit: 1 | 2;
+  trials: CptTrial[];
+}
+
+export interface CptTrialResult {
+  trial_index: number;
+  reaction_ms: number | null;
+  response_count: number;
+}
+
+export interface CptSubmission {
+  protocol_version: string;
+  results: CptTrialResult[];
+  notes?: string;
+  assessed_at?: string;
+}
+
 /* ---------------- Models ---------------- */
 export interface ModelMetrics {
   auc: number;

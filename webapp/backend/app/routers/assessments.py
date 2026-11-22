@@ -1,4 +1,4 @@
-"""Structured assessment endpoints, including the SNAP-IV parent rating scale."""
+"""Structured assessment endpoints: SNAP-IV parent rating and an open IVA-style CPT."""
 
 from __future__ import annotations
 
@@ -14,10 +14,13 @@ from app.schemas import (
     AssessmentCreate,
     AssessmentList,
     AssessmentOut,
+    CptProtocol,
+    CptSubmission,
     ParentRatingCreate,
     ParentRatingDefinition,
 )
 from app.security import get_current_user, require_clinician
+from app.services.cpt import PROTOCOL_VERSION, protocol, score_cpt
 from app.services.rating_scales import (
     INSTRUMENT_ID,
     TITLE_FA,
@@ -82,6 +85,54 @@ def create_parent_rating(
             "participant_id": participant_id,
             "kind": "PARENT_RATING",
             "instrument": INSTRUMENT_ID,
+        },
+    )
+    db.commit()
+    return AssessmentOut.model_validate(assessment)
+
+
+@router.get("/cpt/protocol", response_model=CptProtocol)
+def get_cpt_protocol(current: User = Depends(get_current_user)) -> CptProtocol:
+    """Server-owned trial protocol: digit 1 = target, 2 = non-target, two blocks."""
+    return CptProtocol.model_validate(protocol())
+
+
+@router.post(
+    "/participants/{participant_id}/iva-cpt",
+    response_model=AssessmentOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_iva_cpt(
+    participant_id: int,
+    payload: CptSubmission,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_clinician),
+) -> AssessmentOut:
+    """Score a CPT run and auto-save it onto the participant as kind=IVA2."""
+    _scoped_participant(db, participant_id, current)
+    raw_results = [item.model_dump() for item in payload.results]
+    scores = score_cpt(raw_results)
+
+    assessment = Assessment(
+        participant_id=participant_id,
+        kind="IVA2",
+        version=PROTOCOL_VERSION,
+        scores_json=json.dumps(scores, ensure_ascii=False),
+        assessed_at=payload.assessed_at,
+        notes=payload.notes,
+    )
+    db.add(assessment)
+    db.flush()
+    log_action(
+        db,
+        current,
+        "CREATE_ASSESSMENT",
+        entity="assessment",
+        entity_id=assessment.id,
+        meta={
+            "participant_id": participant_id,
+            "kind": "IVA2",
+            "protocol": PROTOCOL_VERSION,
         },
     )
     db.commit()

@@ -43,7 +43,7 @@ const STAGES: Array<{ key: Stage; label: string }> = [
 /** Upper bound only — we never fabricate a stimulus; we just look for files. */
 const MAX_STIMULI_SCAN = 12;
 /** Visible in the calibration overlay — proves which build the browser loaded. */
-const BUILD_TAG = 'v2026-11-22-d';
+const BUILD_TAG = 'v2026-11-22-e';
 
 /** Honestly probe which stimulus files are actually present in /stimuli/ADHD/.
  *  The protocol target is derived from the count found (e.g. 9 images → 9). */
