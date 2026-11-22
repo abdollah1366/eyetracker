@@ -34,6 +34,8 @@ export function CalibrationOverlay({
   onComplete,
   onContinue,
   status,
+  buildTag,
+  flowLog,
   onCancel,
 }: {
   engine: MediaPipeGaze | null;
@@ -41,6 +43,8 @@ export function CalibrationOverlay({
   onComplete: (calibration: Calibration) => void;
   onContinue: () => void;
   status?: string | null;
+  buildTag?: string;
+  flowLog?: string[];
   onCancel: () => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -55,6 +59,13 @@ export function CalibrationOverlay({
   const phaseStartRef = useRef<number>(performance.now());
   const collectedRef = useRef<CalibrationPoint[]>([]);
   const completedRef = useRef(false);
+  // Keep callbacks in refs so `finish` has a STABLE identity. Otherwise every
+  // parent re-render recreates `finish`, which re-runs the dwell-timer effect,
+  // resets phaseStartRef and the calibration can never advance past 5/5.
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+  const onContinueRef = useRef(onContinue);
+  onContinueRef.current = onContinue;
 
   // The wizard requests fullscreen on click; retry here if that was blocked.
   useEffect(() => {
@@ -107,7 +118,7 @@ export function CalibrationOverlay({
         return { ...p, error_px: Math.hypot(px - p.target_x, py - p.target_y) };
       });
       completedRef.current = true;
-      onComplete({
+      onCompleteRef.current({
         coef: fit.coef,
         mean_error_px: fit.meanErrorPx,
         median_error_px: fit.medianErrorPx,
@@ -115,9 +126,10 @@ export function CalibrationOverlay({
         created_at: new Date().toISOString(),
       });
     } catch (e) {
+      completedRef.current = false;
       setError(`خطا در محاسبه کالیبراسیون: ${e instanceof Error ? e.message : 'نامشخص'}`);
     }
-  }, [onComplete]);
+  }, []); // stable — reads callbacks from refs
 
   // Sample features during the dwell phase.
   useEffect(() => {
@@ -208,6 +220,7 @@ export function CalibrationOverlay({
           <p className="nums mt-0.5 text-[11px] text-primary">
             ثبت شده: {collected.length} / {MIN_POINTS}
           </p>
+          <p className="nums mt-0.5 text-[9px] text-white/35">Build {buildTag ?? 'unknown'}</p>
         </div>
         <div className="flex items-center gap-2">
           {!isFullscreen ? (
@@ -270,11 +283,21 @@ export function CalibrationOverlay({
         ) : null}
         {collected.length >= MIN_POINTS ? (
           <button
-            onClick={() => (completedRef.current ? onContinue() : finish())}
+            onClick={() => {
+              if (completedRef.current) onContinueRef.current();
+              else finish();
+            }}
             className="pointer-events-auto mt-3 rounded-xl bg-success px-4 py-2 text-xs font-bold text-white shadow-lg"
           >
-            اتمام کالیبراسیون و ادامه
+            {completedRef.current ? 'ادامه به جمعآوری داده' : 'اتمام کالیبراسیون و ادامه'}
           </button>
+        ) : null}
+        {flowLog && flowLog.length ? (
+          <div className="pointer-events-none mx-auto mt-3 max-w-lg rounded-lg bg-black/60 p-2 text-right text-[10px] leading-relaxed text-white/70">
+            {flowLog.slice(-6).map((line, i) => (
+              <p key={i} className="nums">{line}</p>
+            ))}
+          </div>
         ) : null}
       </div>
 

@@ -42,6 +42,8 @@ const STAGES: Array<{ key: Stage; label: string }> = [
 ];
 
 const STIMULUS_TARGET = 10;
+/** Visible in the calibration overlay — proves which build the browser loaded. */
+const BUILD_TAG = 'v2026-11-21-b';
 
 /** Honestly probe which of the 10 protocol stimuli are actually available. */
 function probeStimuli(): Promise<StimulusItem[]> {
@@ -97,8 +99,13 @@ export function SessionWizard() {
   const [result, setResult] = useState<Session | null>(null);
   const [creating, setCreating] = useState(false);
   const [flowMessage, setFlowMessage] = useState<string | null>(null);
+  const [flowLog, setFlowLog] = useState<string[]>([]);
   const collectionStartedRef = useRef(false);
   const idempotencyKey = useMemo(() => newIdempotencyKey('session'), []);
+
+  const pushFlow = useCallback((msg: string) => {
+    setFlowLog((prev) => [...prev, `${new Date().toLocaleTimeString('fa-IR')} — ${msg}`]);
+  }, []);
 
   useEffect(() => {
     participantsApi.list({ limit: 500 }).then((res) => setParticipants(res.items ?? [])).catch(() => undefined);
@@ -166,11 +173,17 @@ export function SessionWizard() {
 
   const beginCollection = async (cal: Calibration | null = calibration) => {
     if (!cal || !participantId) {
+      const reason = `توقف: کالیبراسیون=${Boolean(cal)} شرکتکننده=${Boolean(participantId)}`;
+      pushFlow(reason);
+      setFlowMessage(`خطا: ${reason}`);
       void exitFullscreen();
       setStage('calibration');
       return;
     }
     if (stimuli.length === 0) {
+      const reason = 'توقف: هیچ محرکی یافت نشد';
+      pushFlow(reason);
+      setFlowMessage(`خطا: ${reason}`);
       toast.error('هیچ محرکی یافت نشد؛ جمعآوری امکانپذیر نیست.');
       void exitFullscreen();
       setStage('calibration');
@@ -182,6 +195,7 @@ export function SessionWizard() {
     void enterFullscreen();
     setCreating(true);
     setFlowMessage('در حال ایجاد جلسه و آمادهسازی محرکها…');
+    pushFlow('درخواست ساخت جلسه ارسال شد');
     try {
       const created = await sessionsApi.create({
         participant_id: participantId,
@@ -202,12 +216,14 @@ export function SessionWizard() {
         idempotency_key: idempotencyKey,
       });
       collectionStartedRef.current = true;
+      pushFlow(`جلسه ساخت شد (id=${created.id}) → مرحله جمعآوری`);
       setSession(created);
       setFlowMessage('جلسه ساخته شد — آغاز جمعآوری داده');
       setStage('collection');
     } catch (err) {
       collectionStartedRef.current = true;
       const message = apiErrorMessage(err);
+      pushFlow(`خطای ساخت جلسه: ${message}`);
       setFlowMessage(`خطا: ${message}`);
       toast.error(message);
       void exitFullscreen();
@@ -470,21 +486,29 @@ export function SessionWizard() {
           engine={engineRef.current}
           video={videoRef.current}
           onComplete={(cal) => {
+            pushFlow(`دریافت کالیبراسیون (${cal.points?.length ?? 0} نقطه)`);
             setCalibration(cal);
             collectionStartedRef.current = false;
             setFlowMessage('کالیبراسیون تکمیل شد — در حال شروع جمعآوری…');
+            pushFlow('شروع انتقال به جمعآوری');
             toast.success('کالیبراسیون ۵ نقطهای تکمیل شد');
             void beginCollection(cal);
             // Last-resort escape hatch so the screen can never stay frozen.
             window.setTimeout(() => {
               if (collectionStartedRef.current) return;
+              pushFlow('تایمآوت انتقال — بازگشت به کارت کالیبراسیون');
               setFlowMessage('خطا: انتقال به جمعآوری ناموفق بود. لطفاً دوباره تلاش کنید.');
               void exitFullscreen();
               setStage('calibration');
-            }, 4000);
+            }, 6000);
           }}
-          onContinue={() => void beginCollection()}
+          onContinue={() => {
+            pushFlow('ادامه دستی توسط کاربر');
+            void beginCollection();
+          }}
           status={flowMessage}
+          buildTag={BUILD_TAG}
+          flowLog={flowLog}
           onCancel={() => {
             void exitFullscreen();
             setStage('calibration');
