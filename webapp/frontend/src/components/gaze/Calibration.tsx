@@ -13,6 +13,10 @@ import {
 
 const SETTLE_MS = 350;
 const DWELL_MS = 1500;
+/** Never record a point from an empty/no-face window: [0,0,0,0] would corrupt the fit. */
+const MIN_DWELL_FEATURES = 10;
+/** Give the participant time to reposition, then abort with an honest error. */
+const MAX_DWELL_MS = 6000;
 const MIN_POINTS = 5;
 
 /** Inset keeps corner markers clear of the status/progress overlays and fully visible. */
@@ -57,6 +61,7 @@ export function CalibrationOverlay({
   const featuresRef = useRef<number[][]>([]);
   const rafRef = useRef<number>(0);
   const phaseStartRef = useRef<number>(performance.now());
+  const [waitingForFace, setWaitingForFace] = useState(false);
   const collectedRef = useRef<CalibrationPoint[]>([]);
   const completedRef = useRef(false);
   // Keep callbacks in refs so `finish` has a STABLE identity. Otherwise every
@@ -153,31 +158,46 @@ export function CalibrationOverlay({
   useEffect(() => {
     phaseStartRef.current = performance.now();
     featuresRef.current = [];
+    setWaitingForFace(false);
     const duration = phase === 'settle' ? SETTLE_MS : DWELL_MS;
     const id = window.setInterval(() => {
-      if (performance.now() - phaseStartRef.current < duration) return;
+      const elapsed = performance.now() - phaseStartRef.current;
+      if (elapsed < duration) return;
       if (phase === 'settle') {
         setPhase('dwell');
-      } else {
-        const median = medianVector(featuresRef.current);
-        const t = targets[Math.min(index, targets.length - 1)];
-        const next: CalibrationPoint = {
-          target_x: t.x,
-          target_y: t.y,
-          feature: median,
-        };
-        const updated = [...collectedRef.current, next];
-        collectedRef.current = updated;
-        setCollected(updated);
-        if (index + 1 >= targets.length) {
-          window.clearInterval(id);
-          // The ref is already updated synchronously — call finish directly
-          // so no queued timer can be lost during the fullscreen transition.
-          finish();
-        } else {
-          setIndex((i) => i + 1);
-          setPhase('settle');
+        return;
+      }
+      // Only record a point when the camera actually produced gaze features.
+      // Feeding [0,0,0,0] from an empty window corrupts the affine fit and is
+      // the main cause of HIGH_CALIBRATION_ERROR on the result page.
+      if (featuresRef.current.length < MIN_DWELL_FEATURES) {
+        if (elapsed < MAX_DWELL_MS) {
+          setWaitingForFace(true);
+          return; // keep sampling until the participant is detected
         }
+        window.clearInterval(id);
+        setError('چهره/چشم به مدت کافی شناسایی نشد. لطفاً روبروی دوربین باشید و کالیبراسیون را دوباره شروع کنید.');
+        return;
+      }
+      setWaitingForFace(false);
+      const median = medianVector(featuresRef.current);
+      const t = targets[Math.min(index, targets.length - 1)];
+      const next: CalibrationPoint = {
+        target_x: t.x,
+        target_y: t.y,
+        feature: median,
+      };
+      const updated = [...collectedRef.current, next];
+      collectedRef.current = updated;
+      setCollected(updated);
+      if (index + 1 >= targets.length) {
+        window.clearInterval(id);
+        // The ref is already updated synchronously — call finish directly
+        // so no queued timer can be lost during the fullscreen transition.
+        finish();
+      } else {
+        setIndex((i) => i + 1);
+        setPhase('settle');
       }
     }, 40);
     return () => window.clearInterval(id);
@@ -273,7 +293,9 @@ export function CalibrationOverlay({
 
       <div className="absolute inset-x-0 bottom-8 text-center">
         <p className="text-sm font-semibold text-white/80">
-          {phase === 'settle' ? 'روی نقطه تمرکز کنید…' : 'نگاه خود را ثابت نگه دارید'}
+          {waitingForFace
+            ? 'چشم شناسایی نشد — لطفاً روبروی دوربین بمانید…'
+            : phase === 'settle' ? 'روی نقطه تمرکز کنید…' : 'نگاه خود را ثابت نگه دارید'}
         </p>
         <p className="mt-1 text-[11px] text-white/45">برای لغو از کلید Esc استفاده کنید</p>
         {status ? (

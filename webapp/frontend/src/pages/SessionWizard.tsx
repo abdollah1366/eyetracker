@@ -43,7 +43,7 @@ const STAGES: Array<{ key: Stage; label: string }> = [
 /** Upper bound only — we never fabricate a stimulus; we just look for files. */
 const MAX_STIMULI_SCAN = 12;
 /** Visible in the calibration overlay — proves which build the browser loaded. */
-const BUILD_TAG = 'v2026-11-21-c';
+const BUILD_TAG = 'v2026-11-22-d';
 
 /** Honestly probe which stimulus files are actually present in /stimuli/ADHD/.
  *  The protocol target is derived from the count found (e.g. 9 images → 9). */
@@ -291,7 +291,7 @@ export function SessionWizard() {
       <PageHeader
         eyebrow="ثبت جلسه"
         title="جلسه ردیابی چشم جدید"
-        subtitle="رضایت → دوربین → کالیبراسیون → جمعآوری → نتیجه کیفیت"
+        subtitle={`رضایت → دوربین → کالیبراسیون → جمعآوری → نتیجه کیفیت  ·  Build ${BUILD_TAG}`}
       />
 
       {/* stepper */}
