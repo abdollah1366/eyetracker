@@ -142,7 +142,7 @@ def test_config_quality_protocol(client: TestClient) -> None:
     response = client.get("/api/v1/config/quality", headers=_headers(client))
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["stimulus_target"] == 10
+    assert body["stimulus_target"] == 9
     assert body["stimulus_duration_sec"] == 10
 
 

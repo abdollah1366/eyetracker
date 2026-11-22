@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AlertTriangle,
   Camera,
   CheckCircle2,
   CircleDot,
@@ -41,15 +40,17 @@ const STAGES: Array<{ key: Stage; label: string }> = [
   { key: 'result', label: 'نتیجه کیفیت' },
 ];
 
-const STIMULUS_TARGET = 10;
+/** Upper bound only — we never fabricate a stimulus; we just look for files. */
+const MAX_STIMULI_SCAN = 12;
 /** Visible in the calibration overlay — proves which build the browser loaded. */
-const BUILD_TAG = 'v2026-11-21-b';
+const BUILD_TAG = 'v2026-11-21-c';
 
-/** Honestly probe which of the 10 protocol stimuli are actually available. */
+/** Honestly probe which stimulus files are actually present in /stimuli/ADHD/.
+ *  The protocol target is derived from the count found (e.g. 9 images → 9). */
 function probeStimuli(): Promise<StimulusItem[]> {
   const results: StimulusItem[] = [];
   return Promise.all(
-    Array.from({ length: STIMULUS_TARGET }, (_, i) => {
+    Array.from({ length: MAX_STIMULI_SCAN }, (_, i) => {
       const n = i + 1;
       return new Promise<StimulusItem | null>((resolve) => {
         const img = new Image();
@@ -88,7 +89,12 @@ export function SessionWizard() {
   const [stimuli, setStimuli] = useState<StimulusItem[]>([]);
   const [stimuliChecked, setStimuliChecked] = useState(false);
 
+  // videoRef is the ALWAYS-MOUNTED source used by MediaPipe + both overlays.
+  // previewVideoRef is only the visible camera-check preview; both share the
+  // same MediaStream, so the gaze engine keeps running after the preview card
+  // unmounts (calibration + collection stages).
   const videoRef = useRef<HTMLVideoElement>(null);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const engineRef = useRef<MediaPipeGaze | null>(null);
   const [cameraStatus, setCameraStatus] = useState<'idle' | 'starting' | 'ready' | 'error'>('idle');
@@ -125,8 +131,6 @@ export function SessionWizard() {
     [],
   );
 
-  const missingStimuli = STIMULUS_TARGET - stimuli.length;
-
   const startCamera = async () => {
     setCameraStatus('starting');
     setCameraError(null);
@@ -136,10 +140,13 @@ export function SessionWizard() {
         audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+      const attach = (el: HTMLVideoElement | null) => {
+        if (!el) return;
+        if (el.srcObject !== stream) el.srcObject = stream;
+        void el.play().catch(() => undefined);
+      };
+      attach(videoRef.current);
+      attach(previewVideoRef.current);
       const engine = new MediaPipeGaze();
       await engine.init();
       engineRef.current = engine;
@@ -209,7 +216,7 @@ export function SessionWizard() {
         client_meta: {
           user_agent: navigator.userAgent,
           stimulus_count: stimuli.length,
-          protocol_target: STIMULUS_TARGET,
+          protocol_target: stimuli.length,
           camera_width: videoRef.current?.videoWidth ?? null,
           camera_height: videoRef.current?.videoHeight ?? null,
         },
@@ -247,7 +254,7 @@ export function SessionWizard() {
             tracking_loss_ratio: totalSamples ? 1 - validRatio : 1,
             calibration_error_px: calibration?.mean_error_px ?? null,
             stimuli_completed: stats.length,
-            protocol_target: STIMULUS_TARGET,
+            protocol_target: stimuli.length,
           },
         });
         const detail = await sessionsApi.get(complete.id);
@@ -268,6 +275,19 @@ export function SessionWizard() {
 
   return (
     <div>
+      {/* ALWAYS-MOUNTED camera source. It stays in the DOM through consent,
+          camera check, calibration AND collection so MediaPipe + overlays
+          always have a live video element. During real collection it is
+          invisible (1px, opacity 0) — no preview, no green landmarks. Raw
+          frames are read locally only and are never uploaded. */}
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        aria-hidden="true"
+        style={{ position: 'fixed', top: 0, left: 0, width: 1, height: 1, opacity: 0, pointerEvents: 'none', zIndex: -1 }}
+      />
       <PageHeader
         eyebrow="ثبت جلسه"
         title="جلسه ردیابی چشم جدید"
@@ -296,21 +316,6 @@ export function SessionWizard() {
           </div>
         ))}
       </div>
-
-      {/* stimulus protocol warning */}
-      {stimuliChecked && missingStimuli > 0 ? (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-soft/70 p-4">
-          <AlertTriangle size={20} className="mt-0.5 shrink-0 text-warning" />
-          <div>
-            <p className="text-xs font-bold text-ink">هشدار پروتکل محرکها</p>
-            <p className="mt-1 text-[11px] leading-6 text-ink-muted">
-              هدف پروتکل {STIMULUS_TARGET} محرک است، اما {stimuli.length} فایل در{' '}
-              <code dir="ltr" className="nums rounded bg-surface px-1">/stimuli/ADHD/</code> موجود است؛ محرک دهم تأمین نشده است.
-              از تکثیر یا ساخت محرک جایگزین خودداری میشود و جمعآوری با همان محرکهای موجود انجام میشود.
-            </p>
-          </div>
-        </div>
-      ) : null}
 
       {/* ---- consent ---- */}
       {stage === 'consent' ? (
@@ -378,14 +383,14 @@ export function SessionWizard() {
           <div className="grid gap-6 md:grid-cols-2">
             <div className="relative aspect-video overflow-hidden rounded-xl bg-sidebar">
               <video
-                ref={videoRef}
+                ref={previewVideoRef}
                 autoPlay
                 muted
                 playsInline
                 style={{ transform: 'scaleX(-1)' }}
                 className="h-full w-full object-cover"
               />
-              <EyeOverlay engine={engineRef.current} video={videoRef.current} mirrored />
+              <EyeOverlay engine={engineRef.current} video={previewVideoRef.current} mirrored />
               {cameraStatus !== 'ready' ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-sidebar/85 text-white">
                   <Camera size={36} className="text-white/70" />

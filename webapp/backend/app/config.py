@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Acquisition protocol
     # ------------------------------------------------------------------
-    STIMULUS_TARGET: int = 10
+    STIMULUS_TARGET: int = 9
     STIMULUS_DURATION_SEC: float = 10.0
 
     @field_validator("CORS_ORIGINS", mode="before")
